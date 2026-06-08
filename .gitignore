@@ -1,0 +1,81 @@
+# Miscellaneous
+*.class
+*.log
+*.pyc
+*.swp
+.DS_Store
+.atom/
+.build/
+.buildlog/
+.history
+.svn/
+.swiftpm/
+migrate_working_dir/
+
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+.idea/
+
+# The .vscode folder contains launch configuration and tasks you configure in
+# VS Code which you may wish to be included in version control, so this line
+# is commented out by default.
+#.vscode/
+
+# Flutter/Dart/Pub related
+**/doc/api/
+**/ios/Flutter/.last_build_id
+.dart_tool/
+.flutter-plugins-dependencies
+.pub-cache/
+.pub/
+/build/
+/coverage/
+
+# Symbolication related
+app.*.symbols
+
+# Obfuscation related
+app.*.map.json
+
+# Android Studio will place build artifacts here
+/android/app/debug
+/android/app/profile
+/android/app/release
+
+
+
+# VS Code (descomenta si quieres ignorar configuraciones personales)
+.vscode/
+
+# Archivos de entorno y claves 
+*.env
+*.key
+*.p12
+*.jks
+*.keystore
+google-services.json
+GoogleService-Info.plist
+
+# Archivos específicos de Android (evitan subir rutas locales o claves)
+/android/local.properties
+/android/app/debug.keystore
+
+# Archivos específicos de iOS (los Pods se regeneran con pod install)
+/ios/Pods/
+/ios/Podfile.lock   # Opcional: algunas apps versionan Podfile.lock, pero es común ignorarlo
+/ios/.symlinks/
+
+# Archivos de cobertura y métricas (ya tienes /coverage/, pero añado)
+*.lcov
+
+# Isar genera archivos .g.dart (está bien versionarlos, pero si prefieres no hacerlo, añade:)
+# **/*.g.dart
+# **/*.freezed.dart
+
+# Archivos de backup o logs del sistema operativo
+*.tmp
+*.bak
+*.swp
+*.log

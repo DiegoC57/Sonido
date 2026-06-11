@@ -14,6 +14,7 @@ class Song {
   int? albumId;
   String? albumName;
 
+  int? audioId;
   int? duration;
   String? uri;
   int? trackNumber;
@@ -21,6 +22,7 @@ class Song {
   int? year;
   String? artworkPath;
   DateTime? dateAdded;
+  bool isFavorite;
 
   Song({
     required this.title,
@@ -28,6 +30,7 @@ class Song {
     this.artistName,
     this.albumId,
     this.albumName,
+    this.audioId,
     this.duration,
     this.uri,
     this.trackNumber,
@@ -35,5 +38,6 @@ class Song {
     this.year,
     this.artworkPath,
     this.dateAdded,
+    this.isFavorite = false,
   });
 }

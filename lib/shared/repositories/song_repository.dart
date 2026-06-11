@@ -1,3 +1,4 @@
+import 'dart:isolate';
 import 'package:isar_community/isar.dart';
 import 'package:on_audio_query/on_audio_query.dart';
 import '../models/song.dart';
@@ -29,24 +30,7 @@ class SongRepository {
       orderType: OrderType.ASC_OR_SMALLER,
     );
 
-    final songs = songModels.map((s) {
-      final uri = s.uri ?? s.data;
-      return Song(
-        title: s.title,
-        artistId: s.artistId,
-        artistName: s.artist,
-        albumId: s.albumId,
-        albumName: s.album,
-        audioId: s.id,
-        duration: s.duration,
-        uri: uri,
-        trackNumber: s.track,
-        genre: s.genre,
-        dateAdded: s.dateAdded != null
-            ? DateTime.fromMillisecondsSinceEpoch(s.dateAdded! * 1000)
-            : null,
-      );
-    }).toList();
+    final songs = await Isolate.run(() => _mapSongModels(songModels));
 
     await _isar.writeTxn(() async {
       await _isar.songs.clear();
@@ -105,5 +89,26 @@ class SongRepository {
     } catch (_) {
       return null;
     }
+  }
+
+  static List<Song> _mapSongModels(List<SongModel> songModels) {
+    return songModels.map((s) {
+      final uri = s.uri ?? s.data;
+      return Song(
+        title: s.title,
+        artistId: s.artistId,
+        artistName: s.artist,
+        albumId: s.albumId,
+        albumName: s.album,
+        audioId: s.id,
+        duration: s.duration,
+        uri: uri,
+        trackNumber: s.track,
+        genre: s.genre,
+        dateAdded: s.dateAdded != null
+            ? DateTime.fromMillisecondsSinceEpoch(s.dateAdded! * 1000)
+            : null,
+      );
+    }).toList();
   }
 }

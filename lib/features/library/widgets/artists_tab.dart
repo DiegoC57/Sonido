@@ -33,7 +33,6 @@ class ArtistsTab extends ConsumerWidget {
         return ListView.builder(
           padding: const EdgeInsets.symmetric(vertical: 4),
           itemCount: entries.length,
-          itemExtent: 64,
           itemBuilder: (context, index) {
             final entry = entries[index];
             final albums = entry.value
@@ -45,7 +44,7 @@ class ArtistsTab extends ConsumerWidget {
 
             return ListTile(
               contentPadding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+                  const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
               leading: CircleAvatar(
                 radius: 24,
                 backgroundColor: Colors.grey.shade800,

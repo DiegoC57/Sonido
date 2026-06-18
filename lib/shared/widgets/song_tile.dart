@@ -24,7 +24,7 @@ class SongTile extends ConsumerWidget {
         : null;
 
     return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 2),
+      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
       leading: ClipRRect(
         borderRadius: BorderRadius.circular(6),
         child: SizedBox(

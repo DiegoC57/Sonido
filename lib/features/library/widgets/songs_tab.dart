@@ -79,7 +79,6 @@ class SongsTab extends ConsumerWidget {
             Expanded(
               child: ListView.builder(
                 itemCount: songs.length,
-                itemExtent: 64,
                 itemBuilder: (context, index) {
                   final song = songs[index];
                   return SongTile(

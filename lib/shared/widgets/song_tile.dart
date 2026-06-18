@@ -6,11 +6,15 @@ import '../providers/song_provider.dart';
 class SongTile extends ConsumerWidget {
   final Song song;
   final VoidCallback? onTap;
+  final VoidCallback? onPlayNext;
+  final VoidCallback? onAddToQueue;
 
   const SongTile({
     super.key,
     required this.song,
     this.onTap,
+    this.onPlayNext,
+    this.onAddToQueue,
   });
 
   @override
@@ -79,15 +83,6 @@ class SongTile extends ConsumerWidget {
               contentPadding: EdgeInsets.zero,
             ),
           ),
-          const PopupMenuItem(
-            value: 'share',
-            child: ListTile(
-              leading: Icon(Icons.share),
-              title: Text('Compartir'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
         ],
       ),
       onTap: onTap,
@@ -104,12 +99,10 @@ class SongTile extends ConsumerWidget {
   void _onMenuSelected(BuildContext context, String value) {
     switch (value) {
       case 'play_next':
-        break;
+        onPlayNext?.call();
       case 'add_queue':
-        break;
+        onAddToQueue?.call();
       case 'add_playlist':
-        break;
-      case 'share':
         break;
     }
   }

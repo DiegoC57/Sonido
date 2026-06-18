@@ -21,6 +21,8 @@ dependencies:
       ref: 0d78299
       path: packages/on_audio_query
   path_provider: ^2.1.0
+  audio_service: ^0.18.0
+  rxdart: ^0.27.0
 
 dev_dependencies:
   flutter_test:

@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/providers/song_provider.dart';
+import '../../../shared/providers/player_provider.dart';
 import '../../../shared/widgets/song_tile.dart';
 
 class SongsTab extends ConsumerWidget {
@@ -82,7 +84,9 @@ class SongsTab extends ConsumerWidget {
                   final song = songs[index];
                   return SongTile(
                     song: song,
-                    onTap: () => _playSong(context, song),
+                    onTap: () => _playSong(context, ref, songs, index),
+                    onPlayNext: () => _playNext(ref, song),
+                    onAddToQueue: () => _addToQueue(ref, song),
                   );
                 },
               ),
@@ -93,12 +97,22 @@ class SongsTab extends ConsumerWidget {
     );
   }
 
-  void _playSong(BuildContext context, Song song) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Reproduciendo: ${song.title}'),
-        duration: const Duration(seconds: 1),
-      ),
-    );
+  void _playSong(BuildContext context, WidgetRef ref,
+      List<Song> songs, int index) async {
+    final actions = ref.read(playerActionsProvider);
+    await actions.playFromList(songs, index: index);
+    if (context.mounted) {
+      context.push('/player');
+    }
+  }
+
+  void _playNext(WidgetRef ref, Song song) async {
+    final actions = ref.read(playerActionsProvider);
+    await actions.playNext(song);
+  }
+
+  void _addToQueue(WidgetRef ref, Song song) async {
+    final actions = ref.read(playerActionsProvider);
+    await actions.addToQueue(song);
   }
 }

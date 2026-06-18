@@ -34,21 +34,27 @@ const SongSchema = CollectionSchema(
       name: r'artworkPath',
       type: IsarType.string,
     ),
+    r'audioId': PropertySchema(id: 5, name: r'audioId', type: IsarType.long),
     r'dateAdded': PropertySchema(
-      id: 5,
+      id: 6,
       name: r'dateAdded',
       type: IsarType.dateTime,
     ),
-    r'duration': PropertySchema(id: 6, name: r'duration', type: IsarType.long),
-    r'genre': PropertySchema(id: 7, name: r'genre', type: IsarType.string),
-    r'title': PropertySchema(id: 8, name: r'title', type: IsarType.string),
-    r'trackNumber': PropertySchema(
+    r'duration': PropertySchema(id: 7, name: r'duration', type: IsarType.long),
+    r'genre': PropertySchema(id: 8, name: r'genre', type: IsarType.string),
+    r'isFavorite': PropertySchema(
       id: 9,
+      name: r'isFavorite',
+      type: IsarType.bool,
+    ),
+    r'title': PropertySchema(id: 10, name: r'title', type: IsarType.string),
+    r'trackNumber': PropertySchema(
+      id: 11,
       name: r'trackNumber',
       type: IsarType.long,
     ),
-    r'uri': PropertySchema(id: 10, name: r'uri', type: IsarType.string),
-    r'year': PropertySchema(id: 11, name: r'year', type: IsarType.long),
+    r'uri': PropertySchema(id: 12, name: r'uri', type: IsarType.string),
+    r'year': PropertySchema(id: 13, name: r'year', type: IsarType.long),
   },
 
   estimateSize: _songEstimateSize,
@@ -117,13 +123,15 @@ void _songSerialize(
   writer.writeLong(offsets[2], object.artistId);
   writer.writeString(offsets[3], object.artistName);
   writer.writeString(offsets[4], object.artworkPath);
-  writer.writeDateTime(offsets[5], object.dateAdded);
-  writer.writeLong(offsets[6], object.duration);
-  writer.writeString(offsets[7], object.genre);
-  writer.writeString(offsets[8], object.title);
-  writer.writeLong(offsets[9], object.trackNumber);
-  writer.writeString(offsets[10], object.uri);
-  writer.writeLong(offsets[11], object.year);
+  writer.writeLong(offsets[5], object.audioId);
+  writer.writeDateTime(offsets[6], object.dateAdded);
+  writer.writeLong(offsets[7], object.duration);
+  writer.writeString(offsets[8], object.genre);
+  writer.writeBool(offsets[9], object.isFavorite);
+  writer.writeString(offsets[10], object.title);
+  writer.writeLong(offsets[11], object.trackNumber);
+  writer.writeString(offsets[12], object.uri);
+  writer.writeLong(offsets[13], object.year);
 }
 
 Song _songDeserialize(
@@ -138,13 +146,15 @@ Song _songDeserialize(
     artistId: reader.readLongOrNull(offsets[2]),
     artistName: reader.readStringOrNull(offsets[3]),
     artworkPath: reader.readStringOrNull(offsets[4]),
-    dateAdded: reader.readDateTimeOrNull(offsets[5]),
-    duration: reader.readLongOrNull(offsets[6]),
-    genre: reader.readStringOrNull(offsets[7]),
-    title: reader.readString(offsets[8]),
-    trackNumber: reader.readLongOrNull(offsets[9]),
-    uri: reader.readStringOrNull(offsets[10]),
-    year: reader.readLongOrNull(offsets[11]),
+    audioId: reader.readLongOrNull(offsets[5]),
+    dateAdded: reader.readDateTimeOrNull(offsets[6]),
+    duration: reader.readLongOrNull(offsets[7]),
+    genre: reader.readStringOrNull(offsets[8]),
+    isFavorite: reader.readBoolOrNull(offsets[9]) ?? false,
+    title: reader.readString(offsets[10]),
+    trackNumber: reader.readLongOrNull(offsets[11]),
+    uri: reader.readStringOrNull(offsets[12]),
+    year: reader.readLongOrNull(offsets[13]),
   );
   object.id = id;
   return object;
@@ -168,18 +178,22 @@ P _songDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readDateTimeOrNull(offset)) as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 6:
-      return (reader.readLongOrNull(offset)) as P;
+      return (reader.readDateTimeOrNull(offset)) as P;
     case 7:
-      return (reader.readStringOrNull(offset)) as P;
-    case 8:
-      return (reader.readString(offset)) as P;
-    case 9:
       return (reader.readLongOrNull(offset)) as P;
-    case 10:
+    case 8:
       return (reader.readStringOrNull(offset)) as P;
+    case 9:
+      return (reader.readBoolOrNull(offset) ?? false) as P;
+    case 10:
+      return (reader.readString(offset)) as P;
     case 11:
+      return (reader.readLongOrNull(offset)) as P;
+    case 12:
+      return (reader.readStringOrNull(offset)) as P;
+    case 13:
       return (reader.readLongOrNull(offset)) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -909,6 +923,79 @@ extension SongQueryFilter on QueryBuilder<Song, Song, QFilterCondition> {
     });
   }
 
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'audioId'),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'audioId'),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'audioId', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdGreaterThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'audioId',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdLessThan(
+    int? value, {
+    bool include = false,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'audioId',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> audioIdBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'audioId',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
   QueryBuilder<Song, Song, QAfterFilterCondition> dateAddedIsNull() {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1272,6 +1359,16 @@ extension SongQueryFilter on QueryBuilder<Song, Song, QFilterCondition> {
           upper: upper,
           includeUpper: includeUpper,
         ),
+      );
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterFilterCondition> isFavoriteEqualTo(
+    bool value,
+  ) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'isFavorite', value: value),
       );
     });
   }
@@ -1798,6 +1895,18 @@ extension SongQuerySortBy on QueryBuilder<Song, Song, QSortBy> {
     });
   }
 
+  QueryBuilder<Song, Song, QAfterSortBy> sortByAudioId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'audioId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> sortByAudioIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'audioId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Song, Song, QAfterSortBy> sortByDateAdded() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dateAdded', Sort.asc);
@@ -1831,6 +1940,18 @@ extension SongQuerySortBy on QueryBuilder<Song, Song, QSortBy> {
   QueryBuilder<Song, Song, QAfterSortBy> sortByGenreDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'genre', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> sortByIsFavorite() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFavorite', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> sortByIsFavoriteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFavorite', Sort.desc);
     });
   }
 
@@ -1944,6 +2065,18 @@ extension SongQuerySortThenBy on QueryBuilder<Song, Song, QSortThenBy> {
     });
   }
 
+  QueryBuilder<Song, Song, QAfterSortBy> thenByAudioId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'audioId', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> thenByAudioIdDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'audioId', Sort.desc);
+    });
+  }
+
   QueryBuilder<Song, Song, QAfterSortBy> thenByDateAdded() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'dateAdded', Sort.asc);
@@ -1989,6 +2122,18 @@ extension SongQuerySortThenBy on QueryBuilder<Song, Song, QSortThenBy> {
   QueryBuilder<Song, Song, QAfterSortBy> thenByIdDesc() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'id', Sort.desc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> thenByIsFavorite() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFavorite', Sort.asc);
+    });
+  }
+
+  QueryBuilder<Song, Song, QAfterSortBy> thenByIsFavoriteDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'isFavorite', Sort.desc);
     });
   }
 
@@ -2078,6 +2223,12 @@ extension SongQueryWhereDistinct on QueryBuilder<Song, Song, QDistinct> {
     });
   }
 
+  QueryBuilder<Song, Song, QDistinct> distinctByAudioId() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'audioId');
+    });
+  }
+
   QueryBuilder<Song, Song, QDistinct> distinctByDateAdded() {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'dateAdded');
@@ -2095,6 +2246,12 @@ extension SongQueryWhereDistinct on QueryBuilder<Song, Song, QDistinct> {
   }) {
     return QueryBuilder.apply(this, (query) {
       return query.addDistinctBy(r'genre', caseSensitive: caseSensitive);
+    });
+  }
+
+  QueryBuilder<Song, Song, QDistinct> distinctByIsFavorite() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'isFavorite');
     });
   }
 
@@ -2164,6 +2321,12 @@ extension SongQueryProperty on QueryBuilder<Song, Song, QQueryProperty> {
     });
   }
 
+  QueryBuilder<Song, int?, QQueryOperations> audioIdProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'audioId');
+    });
+  }
+
   QueryBuilder<Song, DateTime?, QQueryOperations> dateAddedProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'dateAdded');
@@ -2179,6 +2342,12 @@ extension SongQueryProperty on QueryBuilder<Song, Song, QQueryProperty> {
   QueryBuilder<Song, String?, QQueryOperations> genreProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'genre');
+    });
+  }
+
+  QueryBuilder<Song, bool, QQueryOperations> isFavoriteProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'isFavorite');
     });
   }
 

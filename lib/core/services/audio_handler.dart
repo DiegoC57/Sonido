@@ -176,6 +176,36 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     await _player.setAudioSources(sources);
   }
 
+  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    if (oldIndex == newIndex) return;
+    final item = _queue.removeAt(oldIndex);
+    _queue.insert(newIndex, item);
+    queue.add(_queue);
+
+    final currentIdx = _player.currentIndex ?? 0;
+    var newCurrentIdx = currentIdx;
+    if (currentIdx == oldIndex) {
+      newCurrentIdx = newIndex;
+    } else if (oldIndex < currentIdx && newIndex >= currentIdx) {
+      newCurrentIdx = currentIdx - 1;
+    } else if (oldIndex > currentIdx && newIndex <= currentIdx) {
+      newCurrentIdx = currentIdx + 1;
+    }
+
+    final position = _player.position;
+    final wasPlaying = _player.playing;
+
+    await _player.stop();
+    await _player.setAudioSources(
+      _queue.map((item) => AudioSource.uri(Uri.parse(item.id))).toList(),
+      initialIndex: newCurrentIdx,
+    );
+    await _player.seek(position);
+    if (wasPlaying) {
+      await _player.play();
+    }
+  }
+
   Future<void> clearQueue() async {
     _queue = [];
     queue.add(_queue);

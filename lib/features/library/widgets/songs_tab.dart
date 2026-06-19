@@ -6,11 +6,36 @@ import '../../../shared/providers/song_provider.dart';
 import '../../../shared/providers/player_provider.dart';
 import '../../../shared/widgets/song_tile.dart';
 
-class SongsTab extends ConsumerWidget {
+class SongsTab extends ConsumerStatefulWidget {
   const SongsTab({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<SongsTab> createState() => _SongsTabState();
+}
+
+class _SongsTabState extends ConsumerState<SongsTab> {
+  void _playSong(List<Song> songs, int index) {
+    final actions = ref.read(playerActionsProvider);
+    actions.playFromList(songs, index: index);
+    if (!mounted) return;
+    final currentRoute = GoRouterState.of(context).uri.toString();
+    if (currentRoute != '/player') {
+      context.push('/player');
+    }
+  }
+
+  void _playNext(Song song) async {
+    final actions = ref.read(playerActionsProvider);
+    await actions.playNext(song);
+  }
+
+  void _addToQueue(Song song) async {
+    final actions = ref.read(playerActionsProvider);
+    await actions.addToQueue(song);
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final songsAsync = ref.watch(songsProvider);
 
     return songsAsync.when(
@@ -48,70 +73,25 @@ class SongsTab extends ConsumerWidget {
           );
         }
 
-        return Column(
-          children: [
-            Padding(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-              child: Row(
-                children: [
-                  Text(
-                    '${songs.length} canciones',
-                    style: TextStyle(
-                      color: Colors.grey.shade500,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const Spacer(),
-                  SizedBox(
-                    height: 32,
-                    child: TextButton.icon(
-                      onPressed: () =>
-                          ref.read(songsProvider.notifier).refresh(),
-                      icon: const Icon(Icons.refresh, size: 18),
-                      label: const Text('Actualizar', style: TextStyle(fontSize: 13)),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                itemCount: songs.length,
-                itemBuilder: (context, index) {
-                  final song = songs[index];
-                  return SongTile(
-                    song: song,
-                    onTap: () => _playSong(context, ref, songs, index),
-                    onPlayNext: () => _playNext(ref, song),
-                    onAddToQueue: () => _addToQueue(ref, song),
-                  );
-                },
-              ),
-            ),
-          ],
+        return RefreshIndicator(
+          onRefresh: () => ref.read(songsProvider.notifier).refresh(),
+          displacement: 40,
+          color: Colors.white,
+          backgroundColor: Colors.grey.shade800,
+          child: ListView.builder(
+            itemCount: songs.length,
+            itemBuilder: (context, index) {
+              final song = songs[index];
+              return SongTile(
+                song: song,
+                onTap: () => _playSong(songs, index),
+                onPlayNext: () => _playNext(song),
+                onAddToQueue: () => _addToQueue(song),
+              );
+            },
+          ),
         );
       },
     );
-  }
-
-  void _playSong(BuildContext context, WidgetRef ref,
-      List<Song> songs, int index) async {
-    final actions = ref.read(playerActionsProvider);
-    await actions.playFromList(songs, index: index);
-    if (context.mounted) {
-      context.push('/player');
-    }
-  }
-
-  void _playNext(WidgetRef ref, Song song) async {
-    final actions = ref.read(playerActionsProvider);
-    await actions.playNext(song);
-  }
-
-  void _addToQueue(WidgetRef ref, Song song) async {
-    final actions = ref.read(playerActionsProvider);
-    await actions.addToQueue(song);
   }
 }

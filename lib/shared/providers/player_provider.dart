@@ -1,7 +1,10 @@
 import 'package:audio_service/audio_service.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:palette_generator/palette_generator.dart';
 import '../../core/services/audio_handler.dart';
 import '../models/song.dart';
+import 'song_provider.dart';
 
 final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
   final handler = MusicAudioHandler();
@@ -16,9 +19,9 @@ final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
         androidNotificationClickStartsActivity: true,
       ),
     );
-  } catch (e) {
-    ref.onDispose(() => handler.dispose());
-    rethrow;
+  } catch (_) {
+    // AudioService.init can fail (especially on emulators or without proper setup).
+    // The handler's AudioPlayer works independently, so playback still functions.
   }
   ref.onDispose(() => handler.dispose());
   return handler;
@@ -91,6 +94,19 @@ extension SongToMediaItem on Song {
     );
   }
 }
+
+final dominantColorProvider =
+    FutureProvider.family<Color, int>((ref, audioId) async {
+  final artwork = await ref.watch(artworkProvider(audioId).future);
+  if (artwork == null) return Colors.grey.shade900;
+  final palette = await PaletteGenerator.fromImageProvider(
+    MemoryImage(artwork),
+    maximumColorCount: 8,
+  );
+  return palette.vibrantColor?.color ??
+      palette.dominantColor?.color ??
+      Colors.grey.shade900;
+});
 
 final playerActionsProvider = Provider<PlayerActions>((ref) {
   return PlayerActions(ref);
@@ -173,5 +189,20 @@ class PlayerActions {
       case AudioServiceRepeatMode.group:
         await handler.setRepeatMode(AudioServiceRepeatMode.none);
     }
+  }
+
+  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.reorderQueue(oldIndex, newIndex);
+  }
+
+  Future<void> removeFromQueue(int index) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.removeQueueItemAt(index);
+  }
+
+  Future<void> setVolume(double volume) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.player.setVolume(volume.clamp(0.0, 1.0));
   }
 }

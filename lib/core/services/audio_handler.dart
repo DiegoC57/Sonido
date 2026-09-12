@@ -1,9 +1,13 @@
+import 'dart:io';
 import 'package:audio_service/audio_service.dart';
 import 'package:just_audio/just_audio.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:path_provider/path_provider.dart';
 import 'package:rxdart/rxdart.dart';
 
 class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler {
   final AudioPlayer _player = AudioPlayer();
+  final OnAudioQuery _audioQuery = OnAudioQuery();
   final BehaviorSubject<AudioServiceShuffleMode> _shuffleMode =
       BehaviorSubject.seeded(AudioServiceShuffleMode.none);
   final BehaviorSubject<AudioServiceRepeatMode> _repeatMode =
@@ -27,21 +31,35 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   void _onPlayerStateChanged(PlayerState state) {
+    _broadcastPlaybackState(playing: state.playing);
+  }
+
+  /// Broadcasts the current playback state to the system notification and
+  /// lock screen. Crucially includes [updatePosition]/[bufferedPosition]:
+  /// without them, PlaybackState.position defaults to zero, which is why
+  /// the notification's timeline used to snap back to the start on every
+  /// pause and right after every seek.
+  void _broadcastPlaybackState({bool? playing}) {
     playbackState.add(PlaybackState(
-      playing: state.playing,
-      processingState: _convertProcessingState(state.processingState),
+      playing: playing ?? _player.playing,
+      processingState: _convertProcessingState(_player.processingState),
       controls: [
         MediaControl.skipToPrevious,
-        if (state.playing) MediaControl.pause else MediaControl.play,
+        if (playing ?? _player.playing) MediaControl.pause else MediaControl.play,
         MediaControl.skipToNext,
       ],
       systemActions: {MediaAction.seek},
+      updatePosition: _player.position,
+      bufferedPosition: _player.bufferedPosition,
+      speed: _player.speed,
     ));
   }
 
   void _onCurrentIndexChanged(int? index) {
     if (index != null && index < _queue.length) {
-      mediaItem.add(_queue[index]);
+      final item = _queue[index];
+      mediaItem.add(item);
+      _attachArtworkIfNeeded(item);
     }
   }
 
@@ -49,7 +67,43 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (sequence == null) return;
     final index = sequence.currentIndex;
     if (index != null && index < _queue.length) {
-      mediaItem.add(_queue[index]);
+      final item = _queue[index];
+      mediaItem.add(item);
+      _attachArtworkIfNeeded(item);
+    }
+  }
+
+  /// Lazily resolves and caches the artwork for [item] so the system
+  /// notification and lock screen show real cover art. Only ever fetches
+  /// artwork for whichever track is actually current, and reuses a cached
+  /// file on repeat plays instead of re-querying the OS content resolver.
+  Future<void> _attachArtworkIfNeeded(MediaItem item) async {
+    if (item.artUri != null) return;
+    final audioId = item.extras?['audioId'] as int?;
+    if (audioId == null) return;
+    try {
+      final dir = await getTemporaryDirectory();
+      final file = File('${dir.path}/sonido_artwork_$audioId.jpg');
+      Uri artUri;
+      if (await file.exists()) {
+        artUri = file.uri;
+      } else {
+        final bytes = await _audioQuery.queryArtwork(
+          audioId,
+          ArtworkType.AUDIO,
+          size: 512,
+        );
+        if (bytes == null || bytes.isEmpty) return;
+        await file.writeAsBytes(bytes, flush: true);
+        artUri = file.uri;
+      }
+      // Only apply if this item is still the current one (avoid a stale
+      // update landing after the user has already skipped ahead).
+      if (mediaItem.value?.id == item.id) {
+        mediaItem.add(item.copyWith(artUri: artUri));
+      }
+    } catch (_) {
+      // Artwork is best-effort; playback must never be affected by this.
     }
   }
 
@@ -85,7 +139,10 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   @override
-  Future<void> seek(Duration position) => _player.seek(position);
+  Future<void> seek(Duration position) async {
+    await _player.seek(position);
+    _broadcastPlaybackState();
+  }
 
   @override
   Future<void> skipToNext() => _player.seekToNext();
@@ -98,6 +155,7 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (index < 0 || index >= _queue.length) return;
     await _player.seek(Duration.zero, index: index);
     mediaItem.add(_queue[index]);
+    _broadcastPlaybackState();
   }
 
   @override
@@ -135,7 +193,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     );
 
     if (initialIndex != null && initialIndex < items.length) {
-      mediaItem.add(items[initialIndex]);
+      final item = items[initialIndex];
+      mediaItem.add(item);
+      _attachArtworkIfNeeded(item);
     }
   }
 

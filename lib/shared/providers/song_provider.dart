@@ -5,6 +5,7 @@ import 'package:on_audio_query/on_audio_query.dart';
 import '../models/song.dart';
 import '../repositories/repository_providers.dart';
 import 'audio_query_provider.dart';
+import 'isar_provider.dart';
 
 final songsProvider =
     AsyncNotifierProvider<SongsNotifier, List<Song>>(SongsNotifier.new);
@@ -73,6 +74,11 @@ String? _extractFolder(String? uri) {
     return null;
   }
 }
+
+final songByIdProvider = FutureProvider.family<Song?, int>((ref, songId) async {
+  final isar = await ref.watch(isarProvider.future);
+  return isar.songs.get(songId);
+});
 
 final artworkProvider =
     FutureProvider.family<Uint8List?, int>((ref, audioId) async {

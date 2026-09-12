@@ -5,11 +5,19 @@ import '../../shared/models/album.dart';
 import '../../shared/models/artist.dart';
 import '../../shared/models/playlist.dart';
 import '../../shared/models/playback_info.dart';
+import '../../shared/models/recent_play.dart';
 
 Future<Isar> initIsar() async {
   final dir = await getApplicationDocumentsDirectory();
   return Isar.open(
-    [SongSchema, AlbumSchema, ArtistSchema, PlaylistSchema, PlaybackInfoSchema],
+    [
+      SongSchema,
+      AlbumSchema,
+      ArtistSchema,
+      PlaylistSchema,
+      PlaybackInfoSchema,
+      RecentPlaySchema,
+    ],
     directory: dir.path,
   );
 }

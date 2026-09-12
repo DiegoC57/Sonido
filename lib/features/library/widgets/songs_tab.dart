@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
+import '../../../core/main_shell.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/providers/song_provider.dart';
 import '../../../shared/providers/player_provider.dart';
@@ -15,13 +15,7 @@ class SongsTab extends ConsumerStatefulWidget {
 
 class _SongsTabState extends ConsumerState<SongsTab> {
   void _playSong(List<Song> songs, int index) {
-    final actions = ref.read(playerActionsProvider);
-    actions.playFromList(songs, index: index);
-    if (!mounted) return;
-    final currentRoute = GoRouterState.of(context).uri.toString();
-    if (currentRoute != '/player') {
-      context.push('/player');
-    }
+    ref.read(playerActionsProvider).playFromList(songs, index: index);
   }
 
   void _playNext(Song song) async {
@@ -37,6 +31,10 @@ class _SongsTabState extends ConsumerState<SongsTab> {
   @override
   Widget build(BuildContext context) {
     final songsAsync = ref.watch(songsProvider);
+    final hasMedia = ref.watch(hasMediaProvider).asData?.value ?? false;
+    final bottomPad = MediaQuery.of(context).padding.bottom +
+        kBottomNavHeight +
+        (hasMedia ? kMiniPlayerHeight : 0);
 
     return songsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -79,6 +77,7 @@ class _SongsTabState extends ConsumerState<SongsTab> {
           color: Colors.white,
           backgroundColor: Colors.grey.shade800,
           child: ListView.builder(
+            padding: EdgeInsets.only(bottom: bottomPad),
             itemCount: songs.length,
             itemBuilder: (context, index) {
               final song = songs[index];

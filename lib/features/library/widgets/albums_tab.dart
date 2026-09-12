@@ -1,6 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/main_shell.dart';
+import '../../../shared/models/song.dart';
+import '../../../shared/providers/player_provider.dart';
 import '../../../shared/providers/song_provider.dart';
+import '../../../shared/theme/app_text_styles.dart';
 
 class AlbumsTab extends ConsumerWidget {
   const AlbumsTab({super.key});
@@ -8,6 +12,10 @@ class AlbumsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final albumsAsync = ref.watch(albumsProvider);
+    final hasMedia = ref.watch(hasMediaProvider).asData?.value ?? false;
+    final bottomPad = MediaQuery.of(context).padding.bottom +
+        kBottomNavHeight +
+        (hasMedia ? kMiniPlayerHeight : 0);
 
     return albumsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -31,7 +39,7 @@ class AlbumsTab extends ConsumerWidget {
         }
 
         return GridView.builder(
-          padding: const EdgeInsets.all(12),
+          padding: EdgeInsets.fromLTRB(12, 12, 12, bottomPad),
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             childAspectRatio: 0.72,
@@ -51,6 +59,7 @@ class AlbumsTab extends ConsumerWidget {
               songCount: entry.value.length,
               duration: duration,
               audioId: firstSong.audioId,
+              songs: entry.value,
             );
           },
         );
@@ -65,12 +74,14 @@ class _AlbumCard extends ConsumerWidget {
   final int songCount;
   final int duration;
   final int? audioId;
+  final List<Song> songs;
 
   const _AlbumCard({
     required this.name,
     required this.artistName,
     required this.songCount,
     required this.duration,
+    required this.songs,
     this.audioId,
   });
 
@@ -85,7 +96,9 @@ class _AlbumCard extends ConsumerWidget {
       elevation: 0,
       color: Theme.of(context).colorScheme.surfaceContainerHighest,
       child: InkWell(
-        onTap: () {},
+        onTap: () {
+          ref.read(playerActionsProvider).playFromList(songs);
+        },
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -107,7 +120,7 @@ class _AlbumCard extends ConsumerWidget {
                 name,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
+                style: appListTitle().copyWith(fontSize: 14),
               ),
             ),
             Padding(
@@ -116,10 +129,7 @@ class _AlbumCard extends ConsumerWidget {
                 '$artistName · $songCount canciones',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.grey.shade500,
-                  fontSize: 12,
-                ),
+                style: appSecondary(fontSize: 12, color: Colors.grey.shade500),
               ),
             ),
           ],

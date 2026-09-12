@@ -1,12 +1,15 @@
+
 import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:share_plus/share_plus.dart';
 import '../../shared/providers/player_provider.dart';
 import '../../shared/providers/song_provider.dart';
-import '../../shared/providers/sleep_timer_provider.dart';
+import '../../shared/theme/app_text_styles.dart';
+import '../../shared/utils/duration_formatter.dart';
 import 'widgets/queue_sheet.dart';
-import 'widgets/sleep_timer_dialog.dart';
+import 'widgets/player_options_sheet.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -18,7 +21,7 @@ class PlayerScreen extends ConsumerStatefulWidget {
 class _PlayerScreenState extends ConsumerState<PlayerScreen>
     with SingleTickerProviderStateMixin {
   late AnimationController _rotationController;
-  Color _dominantColor = const Color(0xFF121212);
+  Color _dominantColor = Colors.black;
   double _volumeGestureDelta = 0;
   bool _isExtracting = false;
   int? _lastExtractedId;
@@ -47,7 +50,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       _isExtracting = false;
     }).catchError((_) {
       if (!mounted) return;
-      setState(() => _dominantColor = const Color(0xFF121212));
+      setState(() => _dominantColor = Colors.black);
       _isExtracting = false;
     });
   }
@@ -89,25 +92,17 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const BackButton(color: Colors.white70),
+        leading: IconButton(
+          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 32),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
         title: const SizedBox.shrink(),
         actions: [
-          Consumer(
-            builder: (context, ref, _) {
-              final timerState = ref.watch(sleepTimerProvider);
-              return IconButton(
-                icon: Icon(
-                  timerState.isActive ? Icons.timer : Icons.timer_outlined,
-                  color: timerState.isActive
-                      ? Theme.of(context).colorScheme.primary
-                      : Colors.white70,
-                ),
-                onPressed: () => showDialog(
-                  context: context,
-                  builder: (_) => const SleepTimerDialog(),
-                ),
-              );
-            },
+          IconButton(
+            icon: const Icon(Icons.more_vert, color: Colors.white70),
+            onPressed: mediaItem == null
+                ? null
+                : () => _showOptions(context, mediaItem),
           ),
         ],
       ),
@@ -136,30 +131,11 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                         end: Alignment.bottomCenter,
                         colors: [
                           _dominantColor,
-                          _dominantColor.withAlpha(160),
-                          _dominantColor.withAlpha(60),
+                          _dominantColor.withAlpha(200),
+                          Color.lerp(_dominantColor, Colors.black, 0.6)!,
                           Colors.black,
                         ],
-                        stops: const [0.0, 0.3, 0.7, 1.0],
-                      ),
-                    ),
-                  ),
-                ),
-                Positioned(
-                  top: -100,
-                  left: -100,
-                  right: -100,
-                  child: Container(
-                    height: 300,
-                    decoration: BoxDecoration(
-                      gradient: RadialGradient(
-                        center: Alignment.topCenter,
-                        radius: 0.9,
-                        colors: [
-                          _dominantColor.withAlpha(120),
-                          _dominantColor.withAlpha(40),
-                          Colors.transparent,
-                        ],
+                        stops: const [0.0, 0.35, 0.75, 1.0],
                       ),
                     ),
                   ),
@@ -191,10 +167,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                               child: Text(
                                 key: ValueKey('title_${mediaItem.id}'),
                                 mediaItem.title,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                                style: appTitleLarge(),
                                 textAlign: TextAlign.center,
                                 maxLines: 2,
                                 overflow: TextOverflow.ellipsis,
@@ -203,10 +176,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             const SizedBox(height: 6),
                             Text(
                               mediaItem.artist ?? 'Artista desconocido',
-                              style: TextStyle(
-                                fontSize: 15,
-                                color: Colors.grey.shade400,
-                              ),
+                              style: appSecondary(fontSize: 15, color: Colors.grey.shade400),
                               textAlign: TextAlign.center,
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
@@ -216,7 +186,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                       ),
                       const Spacer(flex: 2),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        padding: const EdgeInsets.symmetric(horizontal: 8),
                         child: _SeekBar(
                           position: position,
                           duration: duration,
@@ -224,7 +194,7 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                           onChanged: (value) => actions.seek(value),
                         ),
                       ),
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 16),
                       _Controls(
                         isPlaying: isPlaying,
                         shuffleMode:
@@ -233,69 +203,30 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                             repeatMode ?? AudioServiceRepeatMode.none,
                         dominantColor: _dominantColor,
                       ),
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 32),
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
                         child: Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             IconButton(
-                              icon: Icon(
-                                Icons.queue_music,
-                                color: Colors.grey.shade400,
-                              ),
-                              onPressed: () => _showQueue(context),
+                              icon: Icon(Icons.cast, color: Colors.grey.shade400),
+                              onPressed: () => _showConnect(context),
                             ),
-                            Consumer(
-                              builder: (context, ref, _) {
-                                final timerState =
-                                    ref.watch(sleepTimerProvider);
-                                if (!timerState.isActive) {
-                                  return const SizedBox.shrink();
-                                }
-                                return GestureDetector(
-                                  onTap: () => showDialog(
-                                    context: context,
-                                    builder: (_) => const SleepTimerDialog(),
-                                  ),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: Theme.of(context)
-                                          .colorScheme
-                                          .primary
-                                          .withAlpha(30),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Icon(
-                                          Icons.timer,
-                                          size: 14,
-                                          color: Theme.of(context)
-                                              .colorScheme
-                                              .primary,
-                                        ),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          _formatDuration(
-                                              timerState.remaining),
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Theme.of(context)
-                                                .colorScheme
-                                                .primary,
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                );
-                              },
+                            Row(
+                              children: [
+                                IconButton(
+                                  icon: Icon(Icons.share_outlined,
+                                      color: Colors.grey.shade400),
+                                  onPressed: () => _shareCurrent(mediaItem),
+                                ),
+                                IconButton(
+                                  icon: Icon(Icons.queue_music,
+                                      color: Colors.grey.shade400),
+                                  onPressed: () => _showQueue(context),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 48),
                           ],
                         ),
                       ),
@@ -305,6 +236,18 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
                 ),
               ],
             ),
+    );
+  }
+
+  void _showOptions(BuildContext context, MediaItem mediaItem) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => PlayerOptionsSheet(mediaItem: mediaItem),
     );
   }
 
@@ -319,11 +262,31 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     );
   }
 
-  String _formatDuration(Duration? d) {
-    if (d == null) return '--:--';
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
+  void _showConnect(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey.shade900,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => const Padding(
+        padding: EdgeInsets.all(32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.cast, size: 40, color: Colors.grey),
+            SizedBox(height: 12),
+            Text('No se encontraron dispositivos', style: TextStyle(color: Colors.grey)),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _shareCurrent(MediaItem mediaItem) {
+    SharePlus.instance.share(
+      ShareParams(text: '${mediaItem.title} - ${mediaItem.artist ?? ''}'),
+    );
   }
 }
 
@@ -475,24 +438,18 @@ class _SeekBar extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               Text(
-                _formatDuration(position),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade400),
+                formatDuration(position),
+                style: appSecondary(fontSize: 12, color: Colors.grey.shade400),
               ),
               Text(
-                _formatDuration(duration),
-                style: TextStyle(fontSize: 11, color: Colors.grey.shade500),
+                formatDuration(duration),
+                style: appSecondary(fontSize: 12, color: Colors.grey.shade500),
               ),
             ],
           ),
         ),
       ],
     );
-  }
-
-  String _formatDuration(Duration d) {
-    final minutes = d.inMinutes.remainder(60).toString().padLeft(2, '0');
-    final seconds = d.inSeconds.remainder(60).toString().padLeft(2, '0');
-    return '$minutes:$seconds';
   }
 }
 
@@ -514,49 +471,48 @@ class _Controls extends StatelessWidget {
     return Consumer(
       builder: (context, ref, _) {
         final actions = ref.read(playerActionsProvider);
-        return Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            _ShuffleButton(mode: shuffleMode),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.skip_previous, size: 30),
-              color: Colors.white70,
-              onPressed: () => actions.skipToPrevious(),
-            ),
-            const SizedBox(width: 8),
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.white,
-                boxShadow: [
-                  BoxShadow(
-                    color: dominantColor.withAlpha(80),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  ),
-                ],
+        return Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: [
+              _ShuffleButton(mode: shuffleMode),
+              IconButton(
+                icon: const Icon(Icons.skip_previous, size: 38),
+                color: Colors.white70,
+                onPressed: () => actions.skipToPrevious(),
               ),
-              child: IconButton(
-                icon: Icon(
-                  isPlaying ? Icons.pause : Icons.play_arrow,
-                  size: 34,
-                  color: Colors.black87,
+              Container(
+                width: 72,
+                height: 72,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white,
+                  boxShadow: [
+                    BoxShadow(
+                      color: dominantColor.withAlpha(80),
+                      blurRadius: 12,
+                      spreadRadius: 1,
+                    ),
+                  ],
                 ),
-                onPressed: () => actions.togglePlayPause(),
+                child: IconButton(
+                  icon: Icon(
+                    isPlaying ? Icons.pause : Icons.play_arrow,
+                    size: 40,
+                    color: Colors.black87,
+                  ),
+                  onPressed: () => actions.togglePlayPause(),
+                ),
               ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: const Icon(Icons.skip_next, size: 30),
-              color: Colors.white70,
-              onPressed: () => actions.skipToNext(),
-            ),
-            const SizedBox(width: 8),
-            _RepeatButton(mode: repeatMode),
-          ],
+              IconButton(
+                icon: const Icon(Icons.skip_next, size: 38),
+                color: Colors.white70,
+                onPressed: () => actions.skipToNext(),
+              ),
+              _RepeatButton(mode: repeatMode),
+            ],
+          ),
         );
       },
     );
@@ -576,7 +532,7 @@ class _ShuffleButton extends StatelessWidget {
         return IconButton(
           icon: Icon(
             Icons.shuffle,
-            size: 22,
+            size: 26,
             color: enabled
                 ? Theme.of(context).colorScheme.primary
                 : Colors.white54,
@@ -611,7 +567,7 @@ class _RepeatButton extends StatelessWidget {
     return Consumer(
       builder: (context, ref, _) {
         return IconButton(
-          icon: Icon(icon, size: 22, color: color),
+          icon: Icon(icon, size: 26, color: color),
           onPressed: () => ref.read(playerActionsProvider).cycleRepeatMode(),
         );
       },

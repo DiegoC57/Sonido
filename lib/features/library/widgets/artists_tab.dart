@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/main_shell.dart';
+import '../../../shared/providers/player_provider.dart';
 import '../../../shared/providers/song_provider.dart';
+import '../../../shared/theme/app_text_styles.dart';
 
 class ArtistsTab extends ConsumerWidget {
   const ArtistsTab({super.key});
@@ -8,6 +11,10 @@ class ArtistsTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final artistsAsync = ref.watch(artistsProvider);
+    final hasMedia = ref.watch(hasMediaProvider).asData?.value ?? false;
+    final bottomPad = MediaQuery.of(context).padding.bottom +
+        kBottomNavHeight +
+        (hasMedia ? kMiniPlayerHeight : 0);
 
     return artistsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -31,7 +38,7 @@ class ArtistsTab extends ConsumerWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: EdgeInsets.fromLTRB(0, 4, 0, bottomPad),
           itemCount: entries.length,
           itemBuilder: (context, index) {
             final entry = entries[index];
@@ -56,15 +63,17 @@ class ArtistsTab extends ConsumerWidget {
                 entry.key,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: appListTitle(),
               ),
               subtitle: Text(
                 '${entry.value.length} canciones · $albums álbumes',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                style: appSecondary(fontSize: 13, color: Colors.grey.shade500),
               ),
-              onTap: () {},
+              onTap: () {
+                ref.read(playerActionsProvider).playFromList(entry.value);
+              },
             );
           },
         );

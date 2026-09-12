@@ -1,10 +1,13 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:on_audio_query/on_audio_query.dart';
 import 'package:palette_generator/palette_generator.dart';
 import '../../core/services/audio_handler.dart';
 import '../models/song.dart';
-import 'song_provider.dart';
+import '../providers/audio_query_provider.dart';
+import '../providers/isar_provider.dart';
+import '../providers/recent_rotation_provider.dart';
 
 final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
   final handler = MusicAudioHandler();
@@ -90,6 +93,7 @@ extension SongToMediaItem on Song {
       extras: {
         'audioId': audioId,
         'albumId': albumId,
+        'songId': id,
       },
     );
   }
@@ -97,11 +101,19 @@ extension SongToMediaItem on Song {
 
 final dominantColorProvider =
     FutureProvider.family<Color, int>((ref, audioId) async {
-  final artwork = await ref.watch(artworkProvider(audioId).future);
-  if (artwork == null) return Colors.grey.shade900;
+  // Use a small dedicated thumbnail (not the 300px UI artwork) so palette
+  // quantization stays cheap — this runs right when a track starts, the
+  // same moment the big player's slide-up transition plays.
+  final audioQuery = ref.watch(audioQueryProvider);
+  final thumbnail = await audioQuery.queryArtwork(
+    audioId,
+    ArtworkType.AUDIO,
+    size: 100,
+  );
+  if (thumbnail == null) return Colors.grey.shade900;
   final palette = await PaletteGenerator.fromImageProvider(
-    MemoryImage(artwork),
-    maximumColorCount: 8,
+    MemoryImage(thumbnail),
+    maximumColorCount: 6,
   );
   return palette.vibrantColor?.color ??
       palette.dominantColor?.color ??
@@ -121,6 +133,7 @@ class PlayerActions {
     final handler = await _ref.read(audioHandlerProvider.future);
     await handler.setQueue([song.toMediaItem()], initialIndex: 0);
     await handler.play();
+    _recordRecentPlay(song);
   }
 
   Future<void> playFromList(List<Song> songs, {int index = 0}) async {
@@ -129,6 +142,27 @@ class PlayerActions {
     final items = songs.map((s) => s.toMediaItem()).toList();
     await handler.setQueue(items, initialIndex: index);
     await handler.play();
+    _recordRecentPlay(songs[index.clamp(0, songs.length - 1)]);
+  }
+
+  void _recordRecentPlay(Song song) {
+    final albumKey = '${song.albumName ?? 'Unknown Album'}|${song.artistName ?? 'Unknown Artist'}';
+    _ref.read(recentRotationProvider.notifier).recordPlay(
+          albumKey: albumKey,
+          albumName: song.albumName,
+          artistName: song.artistName,
+          representativeAudioId: song.audioId,
+        );
+  }
+
+  Future<void> toggleFavorite(int songId) async {
+    final isar = await _ref.read(isarProvider.future);
+    await isar.writeTxn(() async {
+      final song = await isar.songs.get(songId);
+      if (song == null) return;
+      song.isFavorite = !song.isFavorite;
+      await isar.songs.put(song);
+    });
   }
 
   Future<void> playNext(Song song) async {

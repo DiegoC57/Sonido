@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../../shared/providers/player_provider.dart';
 import '../../../shared/providers/song_provider.dart';
+import '../../../shared/theme/app_text_styles.dart';
+import '../../../shared/widgets/marquee_text.dart';
 
 class MiniPlayer extends ConsumerWidget {
   const MiniPlayer({super.key});
@@ -26,108 +28,105 @@ class MiniPlayer extends ConsumerWidget {
         ? (position.inMilliseconds / duration.inMilliseconds).clamp(0.0, 1.0)
         : 0.0;
 
+    final titleAreaWidth = MediaQuery.of(context).size.width * 0.38;
+
     return Container(
-      height: 64,
-      color: Colors.transparent,
+      height: 52,
+      margin: const EdgeInsets.fromLTRB(6, 0, 6, 0),
       child: ClipRRect(
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         clipBehavior: Clip.antiAlias,
         child: Container(
           decoration: BoxDecoration(
-            color: dominantColor?.withAlpha(100) ?? Colors.grey.shade900,
+            color: dominantColor ?? Colors.grey.shade900,
           ),
-          child: Stack(
-            children: [
-              Row(
-                children: [
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: () {
-                      final currentRoute = GoRouterState.of(context).uri.toString();
-                      if (currentRoute != '/player') {
-                        context.push('/player');
-                      }
-                    },
-                    child: Row(
-                      children: [
-                        Hero(
-                          tag: 'player_artwork',
-                          child: Container(
-                            width: 48,
-                            height: 48,
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(10),
-                              color: Colors.grey.shade800,
-                            ),
-                            clipBehavior: Clip.antiAlias,
-                            child: _MiniArtwork(audioId: audioId),
-                          ),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {
+              final currentRoute = GoRouterState.of(context).uri.toString();
+              if (currentRoute != '/player') {
+                context.push('/player');
+              }
+            },
+            child: Stack(
+              children: [
+                Row(
+                  children: [
+                    const SizedBox(width: 6),
+                    Hero(
+                      tag: 'player_artwork',
+                      child: Container(
+                        width: 40,
+                        height: 40,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          color: Colors.grey.shade800,
                         ),
-                        const SizedBox(width: 12),
-                        SizedBox(
-                          width: MediaQuery.of(context).size.width * 0.35,
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                mediaItem.title,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w500,
-                                  color: Colors.white,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                mediaItem.artist ?? '',
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.grey.shade300,
-                                  decoration: TextDecoration.none,
-                                ),
-                              ),
-                            ],
+                        clipBehavior: Clip.antiAlias,
+                        child: _MiniArtwork(audioId: audioId),
+                      ),
+                    ),
+                    const SizedBox(width: 10),
+                    SizedBox(
+                      width: titleAreaWidth,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          MarqueeText(
+                            text: mediaItem.title,
+                            playing: true,
+                            height: 17,
+                            maxWidth: titleAreaWidth,
+                            style: appListTitle()
+                                .copyWith(fontSize: 13, decoration: TextDecoration.none),
                           ),
-                        ),
-                      ],
+                          const SizedBox(height: 1),
+                          Text(
+                            mediaItem.artist ?? '',
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: appSecondary(fontSize: 10, color: Colors.grey.shade400)
+                                .copyWith(decoration: TextDecoration.none),
+                          ),
+                        ],
+                      ),
                     ),
-                  ),
-                  const Spacer(),
-                  IconButton(
-                    icon: Icon(
-                      isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
-                      size: 28,
+                    const Spacer(),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      icon: Icon(
+                        isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                        size: 24,
+                      ),
+                      color: Colors.white,
+                      onPressed: () => actions.togglePlayPause(),
                     ),
-                    color: Colors.white,
-                    onPressed: () => actions.togglePlayPause(),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.skip_next_rounded, size: 28),
-                    color: Colors.white,
-                    onPressed: () => actions.skipToNext(),
-                  ),
-                  const SizedBox(width: 4),
-                ],
-              ),
-              Positioned(
-                bottom: 0,
-                left: 0,
-                right: 0,
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: FractionallySizedBox(
-                    widthFactor: progress,
-                    child: Container(height: 1, color: Colors.white),
+                    IconButton(
+                      padding: EdgeInsets.zero,
+                      constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                      icon: const Icon(Icons.skip_next_rounded, size: 24),
+                      color: Colors.white,
+                      onPressed: () => actions.skipToNext(),
+                    ),
+                    const SizedBox(width: 4),
+                  ],
+                ),
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Align(
+                    alignment: Alignment.centerLeft,
+                    child: FractionallySizedBox(
+                      widthFactor: progress,
+                      child: Container(height: 1, color: Colors.white),
+                    ),
                   ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),

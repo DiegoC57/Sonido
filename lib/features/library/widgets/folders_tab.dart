@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/main_shell.dart';
+import '../../../shared/providers/player_provider.dart';
 import '../../../shared/providers/song_provider.dart';
+import '../../../shared/theme/app_text_styles.dart';
 
 class FoldersTab extends ConsumerWidget {
   const FoldersTab({super.key});
@@ -8,6 +11,10 @@ class FoldersTab extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final foldersAsync = ref.watch(foldersProvider);
+    final hasMedia = ref.watch(hasMediaProvider).asData?.value ?? false;
+    final bottomPad = MediaQuery.of(context).padding.bottom +
+        kBottomNavHeight +
+        (hasMedia ? kMiniPlayerHeight : 0);
 
     return foldersAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
@@ -31,12 +38,10 @@ class FoldersTab extends ConsumerWidget {
         }
 
         return ListView.builder(
-          padding: const EdgeInsets.symmetric(vertical: 4),
+          padding: EdgeInsets.fromLTRB(0, 4, 0, bottomPad),
           itemCount: entries.length,
           itemBuilder: (context, index) {
             final entry = entries[index];
-            entry.value.fold<int>(
-                0, (sum, s) => sum + (s.duration ?? 0));
 
             return ListTile(
               contentPadding:
@@ -50,15 +55,17 @@ class FoldersTab extends ConsumerWidget {
                 entry.key,
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: const TextStyle(fontWeight: FontWeight.w500),
+                style: appListTitle(),
               ),
               subtitle: Text(
                 '${entry.value.length} canciones',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
-                style: TextStyle(color: Colors.grey.shade500, fontSize: 13),
+                style: appSecondary(fontSize: 13, color: Colors.grey.shade500),
               ),
-              onTap: () {},
+              onTap: () {
+                ref.read(playerActionsProvider).playFromList(entry.value);
+              },
             );
           },
         );

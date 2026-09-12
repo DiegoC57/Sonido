@@ -1,7 +1,10 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/song.dart';
+import '../providers/player_provider.dart';
 import '../providers/song_provider.dart';
+import '../theme/app_text_styles.dart';
+import 'equalizer_bars.dart';
 
 class SongTile extends ConsumerWidget {
   final Song song;
@@ -22,6 +25,12 @@ class SongTile extends ConsumerWidget {
     final artworkAsync = song.audioId != null
         ? ref.watch(artworkProvider(song.audioId!))
         : null;
+    final currentItem = ref.watch(currentMediaItemProvider).asData?.value;
+    final isCurrent = currentItem != null &&
+        song.uri != null &&
+        currentItem.id == song.uri;
+    final isPlaying = ref.watch(isPlayingProvider);
+    final nowPlayingColor = Theme.of(context).colorScheme.primary;
 
     return ListTile(
       contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
@@ -41,16 +50,28 @@ class SongTile extends ConsumerWidget {
               _defaultArtwork(),
         ),
       ),
-      title: Text(
-        song.title,
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: const TextStyle(fontWeight: FontWeight.w500),
+      title: Row(
+        children: [
+          if (isCurrent) ...[
+            EqualizerBars(color: nowPlayingColor, animate: isPlaying),
+            const SizedBox(width: 8),
+          ],
+          Expanded(
+            child: Text(
+              song.title,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: appListTitle(color: isCurrent ? nowPlayingColor : Colors.white)
+                  .copyWith(fontSize: 14),
+            ),
+          ),
+        ],
       ),
       subtitle: Text(
         song.artistName ?? 'Unknown Artist',
         maxLines: 1,
         overflow: TextOverflow.ellipsis,
+        style: appSecondary(fontSize: 11, color: Colors.grey.shade400),
       ),
       trailing: PopupMenuButton<String>(
         icon: const Icon(Icons.more_vert, size: 20),

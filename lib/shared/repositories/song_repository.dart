@@ -16,7 +16,7 @@ class SongRepository {
   Future<List<Song>> getAll({bool forceRefresh = false}) async {
     if (!forceRefresh) {
       final cached = await _isar.songs.where().findAll();
-      if (cached.isNotEmpty) return cached;
+      if (cached.isNotEmpty) return _sortByDateAddedDesc(cached);
     }
 
     final hasPermission = await _audioQuery.permissionsStatus();
@@ -26,8 +26,8 @@ class SongRepository {
     }
 
     final songModels = await _audioQuery.querySongs(
-      sortType: SongSortType.TITLE,
-      orderType: OrderType.ASC_OR_SMALLER,
+      sortType: SongSortType.DATE_ADDED,
+      orderType: OrderType.DESC_OR_GREATER,
     );
 
     final songs = await compute(_mapSongModels, songModels);
@@ -37,6 +37,15 @@ class SongRepository {
       await _isar.songs.putAll(songs);
     });
 
+    return _sortByDateAddedDesc(songs);
+  }
+
+  List<Song> _sortByDateAddedDesc(List<Song> songs) {
+    songs.sort((a, b) {
+      final aDate = a.dateAdded ?? DateTime.fromMillisecondsSinceEpoch(0);
+      final bDate = b.dateAdded ?? DateTime.fromMillisecondsSinceEpoch(0);
+      return bDate.compareTo(aDate);
+    });
     return songs;
   }
 

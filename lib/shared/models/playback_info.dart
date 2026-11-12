@@ -14,6 +14,13 @@ class PlaybackInfo {
   bool shuffleEnabled;
   String repeatMode;
 
+  /// URIs of every track in the play queue (in original, unshuffled order),
+  /// so the whole queue — not just the last song — survives an app restart.
+  List<String> queueUris;
+
+  /// Index into [queueUris] of the track that was playing.
+  int? queueIndex;
+
   PlaybackInfo({
     this.lastSongUri,
     this.lastSongTitle,
@@ -22,5 +29,7 @@ class PlaybackInfo {
     this.lastSongAudioId,
     this.shuffleEnabled = false,
     this.repeatMode = 'none',
+    this.queueUris = const [],
+    this.queueIndex,
   });
 }

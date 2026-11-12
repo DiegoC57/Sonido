@@ -26,12 +26,31 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     await _player.setAudioSources([]);
 
     _player.playerStateStream.listen(_onPlayerStateChanged);
+    // playbackEventStream fires on every position discontinuity: seeks,
+    // processing-state changes and — crucially — auto-advancing to the next
+    // track. Without it, an auto-advance (playing stays true) never
+    // re-broadcast updatePosition, so the notification kept extrapolating
+    // from the previous track's last position and its seek bar stuck at
+    // the end.
+    _player.playbackEventStream.listen(
+      (_) => _broadcastPlaybackState(),
+      onError: (Object e, StackTrace st) {},
+    );
     _player.currentIndexStream.listen(_onCurrentIndexChanged);
-    _player.sequenceStateStream.listen(_onSequenceChanged);
+    _player.durationStream.listen(_onDurationChanged);
   }
 
   void _onPlayerStateChanged(PlayerState state) {
     _broadcastPlaybackState(playing: state.playing);
+  }
+
+  /// Keeps the notification's total duration in sync with the real decoded
+  /// duration (the stored metadata can be missing or slightly off).
+  void _onDurationChanged(Duration? duration) {
+    final current = mediaItem.value;
+    if (duration == null || current == null) return;
+    if (current.duration == duration) return;
+    mediaItem.add(current.copyWith(duration: duration));
   }
 
   /// Broadcasts the current playback state to the system notification and
@@ -56,16 +75,6 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   void _onCurrentIndexChanged(int? index) {
-    if (index != null && index < _queue.length) {
-      final item = _queue[index];
-      mediaItem.add(item);
-      _attachArtworkIfNeeded(item);
-    }
-  }
-
-  void _onSequenceChanged(SequenceState? sequence) {
-    if (sequence == null) return;
-    final index = sequence.currentIndex;
     if (index != null && index < _queue.length) {
       final item = _queue[index];
       mediaItem.add(item);
@@ -99,8 +108,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
       }
       // Only apply if this item is still the current one (avoid a stale
       // update landing after the user has already skipped ahead).
-      if (mediaItem.value?.id == item.id) {
-        mediaItem.add(item.copyWith(artUri: artUri));
+      final current = mediaItem.value;
+      if (current?.id == item.id) {
+        mediaItem.add(current!.copyWith(artUri: artUri));
       }
     } catch (_) {
       // Artwork is best-effort; playback must never be affected by this.
@@ -179,7 +189,11 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     _repeatMode.add(repeatMode);
   }
 
-  Future<void> setQueue(List<MediaItem> items, {int? initialIndex}) async {
+  Future<void> setQueue(
+    List<MediaItem> items, {
+    int? initialIndex,
+    Duration? initialPosition,
+  }) async {
     _queue = List.from(items);
     queue.add(_queue);
 
@@ -190,6 +204,7 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     await _player.setAudioSources(
       sources,
       initialIndex: initialIndex ?? 0,
+      initialPosition: initialPosition,
     );
 
     if (initialIndex != null && initialIndex < items.length) {
@@ -217,12 +232,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
 
   @override
   Future<void> removeQueueItem(MediaItem mediaItem) async {
-    _queue.remove(mediaItem);
-    queue.add(_queue);
-    final sources = _queue
-        .map((item) => AudioSource.uri(Uri.parse(item.id)))
-        .toList();
-    await _player.setAudioSources(sources);
+    final index = _queue.indexOf(mediaItem);
+    if (index < 0) return;
+    await removeQueueItemAt(index);
   }
 
   @override
@@ -230,10 +242,8 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     if (index < 0 || index >= _queue.length) return;
     _queue.removeAt(index);
     queue.add(_queue);
-    final sources = _queue
-        .map((item) => AudioSource.uri(Uri.parse(item.id)))
-        .toList();
-    await _player.setAudioSources(sources);
+    // Remove in place so the current track keeps playing.
+    await _player.removeAudioSourceAt(index);
   }
 
   Future<void> reorderQueue(int oldIndex, int newIndex) async {
@@ -241,29 +251,8 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
     final item = _queue.removeAt(oldIndex);
     _queue.insert(newIndex, item);
     queue.add(_queue);
-
-    final currentIdx = _player.currentIndex ?? 0;
-    var newCurrentIdx = currentIdx;
-    if (currentIdx == oldIndex) {
-      newCurrentIdx = newIndex;
-    } else if (oldIndex < currentIdx && newIndex >= currentIdx) {
-      newCurrentIdx = currentIdx - 1;
-    } else if (oldIndex > currentIdx && newIndex <= currentIdx) {
-      newCurrentIdx = currentIdx + 1;
-    }
-
-    final position = _player.position;
-    final wasPlaying = _player.playing;
-
-    await _player.stop();
-    await _player.setAudioSources(
-      _queue.map((item) => AudioSource.uri(Uri.parse(item.id))).toList(),
-      initialIndex: newCurrentIdx,
-    );
-    await _player.seek(position);
-    if (wasPlaying) {
-      await _player.play();
-    }
+    // Move in place: no stop/reload, so playback isn't interrupted.
+    await _player.moveAudioSource(oldIndex, newIndex);
   }
 
   Future<void> clearQueue() async {
@@ -274,6 +263,9 @@ class MusicAudioHandler extends BaseAudioHandler with QueueHandler, SeekHandler 
   }
 
   List<MediaItem> get currentQueue => List.unmodifiable(_queue);
+
+  /// Index (into [currentQueue]) of the track that is currently loaded.
+  int? get currentQueueIndex => _player.currentIndex;
 
   @override
   Future<void> onTaskRemoved() async {

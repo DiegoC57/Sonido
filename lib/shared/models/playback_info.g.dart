@@ -42,13 +42,23 @@ const PlaybackInfoSchema = CollectionSchema(
       name: r'lastSongUri',
       type: IsarType.string,
     ),
-    r'repeatMode': PropertySchema(
+    r'queueIndex': PropertySchema(
       id: 5,
+      name: r'queueIndex',
+      type: IsarType.long,
+    ),
+    r'queueUris': PropertySchema(
+      id: 6,
+      name: r'queueUris',
+      type: IsarType.stringList,
+    ),
+    r'repeatMode': PropertySchema(
+      id: 7,
       name: r'repeatMode',
       type: IsarType.string,
     ),
     r'shuffleEnabled': PropertySchema(
-      id: 6,
+      id: 8,
       name: r'shuffleEnabled',
       type: IsarType.bool,
     ),
@@ -93,6 +103,13 @@ int _playbackInfoEstimateSize(
       bytesCount += 3 + value.length * 3;
     }
   }
+  bytesCount += 3 + object.queueUris.length * 3;
+  {
+    for (var i = 0; i < object.queueUris.length; i++) {
+      final value = object.queueUris[i];
+      bytesCount += value.length * 3;
+    }
+  }
   bytesCount += 3 + object.repeatMode.length * 3;
   return bytesCount;
 }
@@ -108,8 +125,10 @@ void _playbackInfoSerialize(
   writer.writeLong(offsets[2], object.lastSongAudioId);
   writer.writeString(offsets[3], object.lastSongTitle);
   writer.writeString(offsets[4], object.lastSongUri);
-  writer.writeString(offsets[5], object.repeatMode);
-  writer.writeBool(offsets[6], object.shuffleEnabled);
+  writer.writeLong(offsets[5], object.queueIndex);
+  writer.writeStringList(offsets[6], object.queueUris);
+  writer.writeString(offsets[7], object.repeatMode);
+  writer.writeBool(offsets[8], object.shuffleEnabled);
 }
 
 PlaybackInfo _playbackInfoDeserialize(
@@ -124,8 +143,10 @@ PlaybackInfo _playbackInfoDeserialize(
     lastSongAudioId: reader.readLongOrNull(offsets[2]),
     lastSongTitle: reader.readStringOrNull(offsets[3]),
     lastSongUri: reader.readStringOrNull(offsets[4]),
-    repeatMode: reader.readStringOrNull(offsets[5]) ?? 'none',
-    shuffleEnabled: reader.readBoolOrNull(offsets[6]) ?? false,
+    queueIndex: reader.readLongOrNull(offsets[5]),
+    queueUris: reader.readStringList(offsets[6]) ?? const [],
+    repeatMode: reader.readStringOrNull(offsets[7]) ?? 'none',
+    shuffleEnabled: reader.readBoolOrNull(offsets[8]) ?? false,
   );
   object.id = id;
   return object;
@@ -149,8 +170,12 @@ P _playbackInfoDeserializeProp<P>(
     case 4:
       return (reader.readStringOrNull(offset)) as P;
     case 5:
-      return (reader.readStringOrNull(offset) ?? 'none') as P;
+      return (reader.readLongOrNull(offset)) as P;
     case 6:
+      return (reader.readStringList(offset) ?? const []) as P;
+    case 7:
+      return (reader.readStringOrNull(offset) ?? 'none') as P;
+    case 8:
       return (reader.readBoolOrNull(offset) ?? false) as P;
     default:
       throw IsarError('Unknown property with id $propertyId');
@@ -940,6 +965,273 @@ extension PlaybackInfoQueryFilter
   }
 
   QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexIsNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNull(property: r'queueIndex'),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexIsNotNull() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        const FilterCondition.isNotNull(property: r'queueIndex'),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexEqualTo(int? value) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'queueIndex', value: value),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexGreaterThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'queueIndex',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexLessThan(int? value, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'queueIndex',
+          value: value,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueIndexBetween(
+    int? lower,
+    int? upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'queueIndex',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementEqualTo(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementGreaterThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(
+          include: include,
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementLessThan(
+    String value, {
+    bool include = false,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.lessThan(
+          include: include,
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementBetween(
+    String lower,
+    String upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+    bool caseSensitive = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.between(
+          property: r'queueUris',
+          lower: lower,
+          includeLower: includeLower,
+          upper: upper,
+          includeUpper: includeUpper,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementStartsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.startsWith(
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementEndsWith(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.endsWith(
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementContains(String value, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.contains(
+          property: r'queueUris',
+          value: value,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementMatches(String pattern, {bool caseSensitive = true}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.matches(
+          property: r'queueUris',
+          wildcard: pattern,
+          caseSensitive: caseSensitive,
+        ),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.equalTo(property: r'queueUris', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisElementIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addFilterCondition(
+        FilterCondition.greaterThan(property: r'queueUris', value: ''),
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisLengthEqualTo(int length) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'queueUris', length, true, length, true);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisIsEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'queueUris', 0, true, 0, true);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisIsNotEmpty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'queueUris', 0, false, 999999, true);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisLengthLessThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'queueUris', 0, true, length, include);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisLengthGreaterThan(int length, {bool include = false}) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(r'queueUris', length, include, 999999, true);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
+  queueUrisLengthBetween(
+    int lower,
+    int upper, {
+    bool includeLower = true,
+    bool includeUpper = true,
+  }) {
+    return QueryBuilder.apply(this, (query) {
+      return query.listLength(
+        r'queueUris',
+        lower,
+        includeLower,
+        upper,
+        includeUpper,
+      );
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterFilterCondition>
   repeatModeEqualTo(String value, {bool caseSensitive = true}) {
     return QueryBuilder.apply(this, (query) {
       return query.addFilterCondition(
@@ -1166,6 +1458,19 @@ extension PlaybackInfoQuerySortBy
     });
   }
 
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy> sortByQueueIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'queueIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy>
+  sortByQueueIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'queueIndex', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy> sortByRepeatMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'repeatMode', Sort.asc);
@@ -1276,6 +1581,19 @@ extension PlaybackInfoQuerySortThenBy
     });
   }
 
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy> thenByQueueIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'queueIndex', Sort.asc);
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy>
+  thenByQueueIndexDesc() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addSortBy(r'queueIndex', Sort.desc);
+    });
+  }
+
   QueryBuilder<PlaybackInfo, PlaybackInfo, QAfterSortBy> thenByRepeatMode() {
     return QueryBuilder.apply(this, (query) {
       return query.addSortBy(r'repeatMode', Sort.asc);
@@ -1350,6 +1668,18 @@ extension PlaybackInfoQueryWhereDistinct
     });
   }
 
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QDistinct> distinctByQueueIndex() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'queueIndex');
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, PlaybackInfo, QDistinct> distinctByQueueUris() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addDistinctBy(r'queueUris');
+    });
+  }
+
   QueryBuilder<PlaybackInfo, PlaybackInfo, QDistinct> distinctByRepeatMode({
     bool caseSensitive = true,
   }) {
@@ -1403,6 +1733,19 @@ extension PlaybackInfoQueryProperty
   QueryBuilder<PlaybackInfo, String?, QQueryOperations> lastSongUriProperty() {
     return QueryBuilder.apply(this, (query) {
       return query.addPropertyName(r'lastSongUri');
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, int?, QQueryOperations> queueIndexProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'queueIndex');
+    });
+  }
+
+  QueryBuilder<PlaybackInfo, List<String>, QQueryOperations>
+  queueUrisProperty() {
+    return QueryBuilder.apply(this, (query) {
+      return query.addPropertyName(r'queueUris');
     });
   }
 

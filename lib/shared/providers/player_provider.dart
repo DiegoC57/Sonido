@@ -21,6 +21,8 @@ final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
         androidNotificationOngoing: true,
         androidStopForegroundOnPause: true,
         androidNotificationClickStartsActivity: true,
+        // White silhouette in res/drawable-*/ic_stat_sonido.png.
+        androidNotificationIcon: 'drawable/ic_stat_sonido',
       ),
     );
   } catch (_) {

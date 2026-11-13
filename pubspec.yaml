@@ -21,6 +21,11 @@ dependencies:
       ref: 0d78299
       path: packages/on_audio_query
   path_provider: ^2.1.0
+  audio_service: ^0.18.0
+  rxdart: ^0.27.0
+  palette_generator: ^0.3.3+7
+  share_plus: ^13.3.0
+  google_fonts: ^8.2.1
 
 dev_dependencies:
   flutter_test:
@@ -28,6 +33,14 @@ dev_dependencies:
   flutter_lints: ^6.0.0
   isar_community_generator: ^3.3.2
   build_runner: ^2.4.0
+  flutter_launcher_icons: ^0.14.4
 
 flutter:
   uses-material-design: true
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  image_path: "assets/icon/icon.png"
+  adaptive_icon_background: "#0B0B0C"
+  adaptive_icon_foreground: "assets/icon/icon_foreground.png"
+  adaptive_icon_monochrome: "assets/icon/icon_monochrome.png"

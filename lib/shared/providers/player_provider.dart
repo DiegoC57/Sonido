@@ -1,0 +1,282 @@
+import 'package:audio_service/audio_service.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:on_audio_query/on_audio_query.dart';
+import 'package:palette_generator/palette_generator.dart';
+import '../../core/services/audio_handler.dart';
+import '../models/song.dart';
+import '../providers/audio_query_provider.dart';
+import '../providers/isar_provider.dart';
+import '../providers/recent_rotation_provider.dart';
+import '../providers/song_provider.dart';
+
+final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
+  final handler = MusicAudioHandler();
+  try {
+    await AudioService.init(
+      builder: () => handler,
+      config: const AudioServiceConfig(
+        androidNotificationChannelId: 'com.sonido.sonido.channel',
+        androidNotificationChannelName: 'Sonido',
+        androidNotificationOngoing: true,
+        androidStopForegroundOnPause: true,
+        androidNotificationClickStartsActivity: true,
+        // White silhouette in res/drawable-*/ic_stat_sonido.png.
+        androidNotificationIcon: 'drawable/ic_stat_sonido',
+      ),
+    );
+  } catch (_) {
+    // AudioService.init can fail (especially on emulators or without proper setup).
+    // The handler's AudioPlayer works independently, so playback still functions.
+  }
+  ref.onDispose(() => handler.dispose());
+  return handler;
+});
+
+final _handlerValue = Provider<MusicAudioHandler?>((ref) {
+  return ref.watch(audioHandlerProvider).asData?.value;
+});
+
+final currentMediaItemProvider = StreamProvider<MediaItem?>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return Stream.value(null);
+  return handler.mediaItem.stream;
+});
+
+final playerStateProvider = StreamProvider<PlaybackState>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return const Stream.empty();
+  return handler.playbackState.stream;
+});
+
+final isPlayingProvider = Provider<bool>((ref) {
+  final state = ref.watch(playerStateProvider).asData?.value;
+  return state?.playing ?? false;
+});
+
+final positionProvider = StreamProvider<Duration>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return const Stream.empty();
+  return handler.player.positionStream;
+});
+
+final durationProvider = StreamProvider<Duration?>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return const Stream.empty();
+  return handler.player.durationStream;
+});
+
+/// Index (into the queue) of the track currently loaded in the player.
+final currentIndexProvider = StreamProvider<int?>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return Stream.value(null);
+  return handler.player.currentIndexStream;
+});
+
+final shuffleModeProvider = StreamProvider<AudioServiceShuffleMode>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return Stream.value(AudioServiceShuffleMode.none);
+  return handler.shuffleMode;
+});
+
+final repeatModeProvider = StreamProvider<AudioServiceRepeatMode>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return Stream.value(AudioServiceRepeatMode.none);
+  return handler.repeatMode;
+});
+
+final queueProvider = StreamProvider<List<MediaItem>>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return const Stream.empty();
+  return handler.queue.stream;
+});
+
+extension SongToMediaItem on Song {
+  MediaItem toMediaItem() {
+    return MediaItem(
+      id: uri ?? '',
+      title: title,
+      artist: artistName,
+      album: albumName,
+      duration: Duration(milliseconds: duration ?? 0),
+      artUri: null,
+      extras: {
+        'audioId': audioId,
+        'albumId': albumId,
+        'songId': id,
+      },
+    );
+  }
+}
+
+final dominantColorProvider =
+    FutureProvider.family<Color, int>((ref, audioId) async {
+  // Use a small dedicated thumbnail (not the 300px UI artwork) so palette
+  // quantization stays cheap — this runs right when a track starts, the
+  // same moment the big player's slide-up transition plays.
+  final audioQuery = ref.watch(audioQueryProvider);
+  final thumbnail = await audioQuery.queryArtwork(
+    audioId,
+    ArtworkType.AUDIO,
+    size: 100,
+  );
+  if (thumbnail == null) return Colors.grey.shade900;
+  final palette = await PaletteGenerator.fromImageProvider(
+    MemoryImage(thumbnail),
+    maximumColorCount: 6,
+  );
+  return palette.vibrantColor?.color ??
+      palette.dominantColor?.color ??
+      Colors.grey.shade900;
+});
+
+/// Bright, saturated accent taken from the cover (the "c2" color of the
+/// Onda spec) — used for the big player's progress fill. Kept separate from
+/// [dominantColorProvider] so the mini player's color is unaffected.
+final vividColorProvider =
+    FutureProvider.family<Color, int>((ref, audioId) async {
+  final audioQuery = ref.watch(audioQueryProvider);
+  final thumbnail = await audioQuery.queryArtwork(
+    audioId,
+    ArtworkType.AUDIO,
+    size: 100,
+  );
+  const fallback = Color(0xFFF4F2EE);
+  if (thumbnail == null) return fallback;
+  final palette = await PaletteGenerator.fromImageProvider(
+    MemoryImage(thumbnail),
+    maximumColorCount: 12,
+  );
+  final candidate = palette.lightVibrantColor?.color ??
+      palette.vibrantColor?.color ??
+      palette.lightMutedColor?.color ??
+      palette.dominantColor?.color;
+  if (candidate == null) return fallback;
+  // Make sure it reads against the dark track.
+  final hsl = HSLColor.fromColor(candidate);
+  return hsl.lightness < 0.55
+      ? hsl.withLightness(0.62).toColor()
+      : candidate;
+});
+
+final playerActionsProvider = Provider<PlayerActions>((ref) {
+  return PlayerActions(ref);
+});
+
+class PlayerActions {
+  final Ref _ref;
+
+  PlayerActions(this._ref);
+
+  Future<void> play(Song song) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.setQueue([song.toMediaItem()], initialIndex: 0);
+    await handler.play();
+    _recordRecentPlay(song);
+  }
+
+  Future<void> playFromList(List<Song> songs, {int index = 0}) async {
+    if (songs.isEmpty) return;
+    final handler = await _ref.read(audioHandlerProvider.future);
+    final items = songs.map((s) => s.toMediaItem()).toList();
+    await handler.setQueue(items, initialIndex: index);
+    await handler.play();
+    _recordRecentPlay(songs[index.clamp(0, songs.length - 1)]);
+  }
+
+  void _recordRecentPlay(Song song) {
+    final albumKey = '${song.albumName ?? 'Unknown Album'}|${song.artistName ?? 'Unknown Artist'}';
+    _ref.read(recentRotationProvider.notifier).recordPlay(
+          albumKey: albumKey,
+          albumName: song.albumName,
+          artistName: song.artistName,
+          representativeAudioId: song.audioId,
+        );
+  }
+
+  Future<void> toggleFavorite(int songId) async {
+    final isar = await _ref.read(isarProvider.future);
+    await isar.writeTxn(() async {
+      final song = await isar.songs.get(songId);
+      if (song == null) return;
+      song.isFavorite = !song.isFavorite;
+      await isar.songs.put(song);
+    });
+    _ref.invalidate(songByIdProvider(songId));
+  }
+
+  Future<void> playNext(Song song) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    final index = handler.player.currentIndex ?? 0;
+    await handler.insertQueueItem(index + 1, song.toMediaItem());
+  }
+
+  Future<void> addToQueue(Song song) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.addQueueItem(song.toMediaItem());
+  }
+
+  Future<void> togglePlayPause() async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    if (handler.playbackState.value.playing) {
+      await handler.pause();
+    } else {
+      await handler.play();
+    }
+  }
+
+  Future<void> seek(Duration position) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.seek(position);
+  }
+
+  Future<void> skipToNext() async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.skipToNext();
+  }
+
+  Future<void> skipToPrevious() async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.skipToPrevious();
+  }
+
+  Future<void> toggleShuffle() async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    final current = handler.shuffleMode.value;
+    await handler.setShuffleMode(
+      current == AudioServiceShuffleMode.all
+          ? AudioServiceShuffleMode.none
+          : AudioServiceShuffleMode.all,
+    );
+  }
+
+  Future<void> cycleRepeatMode() async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    final current = handler.repeatMode.value;
+    switch (current) {
+      case AudioServiceRepeatMode.none:
+        await handler.setRepeatMode(AudioServiceRepeatMode.all);
+      case AudioServiceRepeatMode.all:
+        await handler.setRepeatMode(AudioServiceRepeatMode.one);
+      case AudioServiceRepeatMode.one:
+        await handler.setRepeatMode(AudioServiceRepeatMode.none);
+      case AudioServiceRepeatMode.group:
+        await handler.setRepeatMode(AudioServiceRepeatMode.none);
+    }
+  }
+
+  Future<void> reorderQueue(int oldIndex, int newIndex) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.reorderQueue(oldIndex, newIndex);
+  }
+
+  Future<void> removeFromQueue(int index) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.removeQueueItemAt(index);
+  }
+
+  Future<void> setVolume(double volume) async {
+    final handler = await _ref.read(audioHandlerProvider.future);
+    await handler.player.setVolume(volume.clamp(0.0, 1.0));
+  }
+}

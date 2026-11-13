@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/playlist.dart';
+import '../providers/playlist_provider.dart';
 import '../repositories/repository_providers.dart';
 
 Future<Playlist?> showCreatePlaylistDialog(
@@ -11,8 +12,6 @@ Future<Playlist?> showCreatePlaylistDialog(
   final name = await showDialog<String>(
     context: context,
     builder: (ctx) => AlertDialog(
-      backgroundColor: Colors.grey.shade900,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       title: const Text('Nueva playlist'),
       content: TextField(
         controller: controller,
@@ -41,5 +40,7 @@ Future<Playlist?> showCreatePlaylistDialog(
 
   if (name == null || name.isEmpty) return null;
   final repo = await ref.read(playlistRepositoryProvider.future);
-  return repo.create(name);
+  final playlist = await repo.create(name);
+  ref.invalidate(playlistsProvider);
+  return playlist;
 }

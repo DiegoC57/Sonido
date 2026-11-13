@@ -2,15 +2,18 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/song.dart';
 import '../providers/player_provider.dart';
-import '../providers/song_provider.dart';
-import '../theme/app_text_styles.dart';
+import '../theme/onda.dart';
+import 'artwork.dart';
 import 'equalizer_bars.dart';
+import 'onda_widgets.dart';
 
+/// Track row: 48px cover · title · "Canción · artista" · mono duration · menu.
 class SongTile extends ConsumerWidget {
   final Song song;
   final VoidCallback? onTap;
   final VoidCallback? onPlayNext;
   final VoidCallback? onAddToQueue;
+  final bool showTypeLabel;
 
   const SongTile({
     super.key,
@@ -18,113 +21,87 @@ class SongTile extends ConsumerWidget {
     this.onTap,
     this.onPlayNext,
     this.onAddToQueue,
+    this.showTypeLabel = false,
   });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final artworkAsync = song.audioId != null
-        ? ref.watch(artworkProvider(song.audioId!))
-        : null;
     final currentItem = ref.watch(currentMediaItemProvider).asData?.value;
-    final isCurrent = currentItem != null &&
-        song.uri != null &&
-        currentItem.id == song.uri;
+    final isCurrent =
+        currentItem != null && song.uri != null && currentItem.id == song.uri;
     final isPlaying = ref.watch(isPlayingProvider);
-    final nowPlayingColor = Theme.of(context).colorScheme.primary;
+    final artist = song.artistName ?? 'Artista desconocido';
+    final duration = song.duration;
 
-    return ListTile(
-      contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 0),
-      leading: ClipRRect(
-        borderRadius: BorderRadius.circular(6),
-        child: SizedBox(
-          width: 52,
-          height: 52,
-          child: artworkAsync?.when(
-                loading: () => _defaultArtwork(),
-                error: (_, _) => _defaultArtwork(),
-                data: (bytes) {
-                    if (bytes == null) return _defaultArtwork();
-                    return Image.memory(bytes, fit: BoxFit.cover);
-                  },
-              ) ??
-              _defaultArtwork(),
-        ),
-      ),
-      title: Row(
-        children: [
-          if (isCurrent) ...[
-            EqualizerBars(color: nowPlayingColor, animate: isPlaying),
-            const SizedBox(width: 8),
-          ],
-          Expanded(
-            child: Text(
-              song.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: appListTitle(color: isCurrent ? nowPlayingColor : Colors.white)
-                  .copyWith(fontSize: 14),
-            ),
-          ),
-        ],
-      ),
-      subtitle: Text(
-        song.artistName ?? 'Unknown Artist',
-        maxLines: 1,
-        overflow: TextOverflow.ellipsis,
-        style: appSecondary(fontSize: 11, color: Colors.grey.shade400),
-      ),
-      trailing: PopupMenuButton<String>(
-        icon: const Icon(Icons.more_vert, size: 20),
-        onSelected: (value) => _onMenuSelected(context, value),
-        itemBuilder: (_) => [
-          const PopupMenuItem(
-            value: 'play_next',
-            child: ListTile(
-              leading: Icon(Icons.skip_next),
-              title: Text('Reproducir siguiente'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'add_queue',
-            child: ListTile(
-              leading: Icon(Icons.queue_music),
-              title: Text('Agregar a cola'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-          const PopupMenuItem(
-            value: 'add_playlist',
-            child: ListTile(
-              leading: Icon(Icons.playlist_add),
-              title: Text('Agregar a playlist'),
-              dense: true,
-              contentPadding: EdgeInsets.zero,
-            ),
-          ),
-        ],
-      ),
+    final hasMenu = onPlayNext != null || onAddToQueue != null;
+
+    return MediaRow(
       onTap: onTap,
+      // With a menu, the dots' own 32px touch area provides the right inset,
+      // so the trailing group sits near (not on) the screen edge.
+      padding: EdgeInsets.fromLTRB(
+          Onda.gutter, 8, hasMenu ? 6 : Onda.gutter, 8),
+      gap: 12,
+      titleSize: 13.5,
+      leading: Artwork(
+        audioId: song.audioId,
+        seed: song.albumName ?? song.title,
+        size: 48,
+      ),
+      title: song.title,
+      titleColor: isCurrent ? Onda.accent : Onda.text,
+      subtitle: showTypeLabel ? 'Canción · $artist' : artist,
+      subtitleLeading: song.isFavorite
+          ? const Icon(Icons.check_circle, size: 11, color: Onda.success)
+          : null,
+      trailing: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const SizedBox(width: 12),
+          if (isCurrent)
+            Padding(
+              padding: EdgeInsets.only(right: hasMenu ? 4 : 0),
+              child: EqualizerBars(color: Onda.accent, animate: isPlaying),
+            )
+          else if (duration != null && duration > 0)
+            Padding(
+              padding: EdgeInsets.only(right: hasMenu ? 2 : 0),
+              child: Text(
+                formatMinSec(Duration(milliseconds: duration)),
+                style: Onda.mono(11, weight: FontWeight.w400, tracking: 0,
+                    color: Onda.textFaint),
+              ),
+            ),
+          if (hasMenu)
+            PopupMenuButton<String>(
+              tooltip: 'Más opciones',
+              padding: EdgeInsets.zero,
+              // Compact 32×44 touch target instead of the default 48px
+              // IconButton, which pushed the dots far from the edge.
+              child: const SizedBox(
+                width: 32,
+                height: 44,
+                child: Center(child: DotsIcon()),
+              ),
+              onSelected: (value) {
+                if (value == 'play_next') onPlayNext?.call();
+                if (value == 'add_queue') onAddToQueue?.call();
+              },
+              itemBuilder: (_) => [
+                if (onPlayNext != null)
+                  const PopupMenuItem(
+                    value: 'play_next',
+                    child: Text('Reproducir a continuación'),
+                  ),
+                if (onAddToQueue != null)
+                  const PopupMenuItem(
+                    value: 'add_queue',
+                    child: Text('Agregar a la cola'),
+                  ),
+              ],
+            ),
+        ],
+      ),
     );
-  }
-
-  Widget _defaultArtwork() {
-    return Container(
-      color: Colors.grey.shade800,
-      child: Icon(Icons.music_note, color: Colors.grey.shade500, size: 28),
-    );
-  }
-
-  void _onMenuSelected(BuildContext context, String value) {
-    switch (value) {
-      case 'play_next':
-        onPlayNext?.call();
-      case 'add_queue':
-        onAddToQueue?.call();
-      case 'add_playlist':
-        break;
-    }
   }
 }

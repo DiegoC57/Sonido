@@ -10,7 +10,6 @@ class SleepTimerDialog extends ConsumerWidget {
     final timerState = ref.watch(sleepTimerProvider);
 
     return AlertDialog(
-      backgroundColor: Colors.grey.shade900,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
       title: Row(
         children: [

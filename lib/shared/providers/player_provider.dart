@@ -8,6 +8,7 @@ import '../models/song.dart';
 import '../providers/audio_query_provider.dart';
 import '../providers/isar_provider.dart';
 import '../providers/recent_rotation_provider.dart';
+import '../providers/song_provider.dart';
 
 final audioHandlerProvider = FutureProvider<MusicAudioHandler>((ref) async {
   final handler = MusicAudioHandler();
@@ -61,6 +62,13 @@ final durationProvider = StreamProvider<Duration?>((ref) {
   final handler = ref.watch(_handlerValue);
   if (handler == null) return const Stream.empty();
   return handler.player.durationStream;
+});
+
+/// Index (into the queue) of the track currently loaded in the player.
+final currentIndexProvider = StreamProvider<int?>((ref) {
+  final handler = ref.watch(_handlerValue);
+  if (handler == null) return Stream.value(null);
+  return handler.player.currentIndexStream;
 });
 
 final shuffleModeProvider = StreamProvider<AudioServiceShuffleMode>((ref) {
@@ -120,6 +128,35 @@ final dominantColorProvider =
       Colors.grey.shade900;
 });
 
+/// Bright, saturated accent taken from the cover (the "c2" color of the
+/// Onda spec) — used for the big player's progress fill. Kept separate from
+/// [dominantColorProvider] so the mini player's color is unaffected.
+final vividColorProvider =
+    FutureProvider.family<Color, int>((ref, audioId) async {
+  final audioQuery = ref.watch(audioQueryProvider);
+  final thumbnail = await audioQuery.queryArtwork(
+    audioId,
+    ArtworkType.AUDIO,
+    size: 100,
+  );
+  const fallback = Color(0xFFF4F2EE);
+  if (thumbnail == null) return fallback;
+  final palette = await PaletteGenerator.fromImageProvider(
+    MemoryImage(thumbnail),
+    maximumColorCount: 12,
+  );
+  final candidate = palette.lightVibrantColor?.color ??
+      palette.vibrantColor?.color ??
+      palette.lightMutedColor?.color ??
+      palette.dominantColor?.color;
+  if (candidate == null) return fallback;
+  // Make sure it reads against the dark track.
+  final hsl = HSLColor.fromColor(candidate);
+  return hsl.lightness < 0.55
+      ? hsl.withLightness(0.62).toColor()
+      : candidate;
+});
+
 final playerActionsProvider = Provider<PlayerActions>((ref) {
   return PlayerActions(ref);
 });
@@ -163,6 +200,7 @@ class PlayerActions {
       song.isFavorite = !song.isFavorite;
       await isar.songs.put(song);
     });
+    _ref.invalidate(songByIdProvider(songId));
   }
 
   Future<void> playNext(Song song) async {

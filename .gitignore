@@ -67,6 +67,8 @@ GoogleService-Info.plist
 /ios/Podfile.lock   # Opcional: algunas apps versionan Podfile.lock, pero es común ignorarlo
 /ios/.symlinks/
 
+/design/
+
 # Archivos de cobertura y métricas (ya tienes /coverage/, pero añado)
 *.lcov
 

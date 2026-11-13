@@ -6,7 +6,9 @@ import '../features/home/home_screen.dart';
 import '../features/search/search_screen.dart';
 import '../features/library/library_screen.dart';
 import '../features/player/player_screen.dart';
+import '../features/album/album_screen.dart';
 import '../features/playlist/playlist_detail_screen.dart';
+import '../shared/theme/onda.dart';
 
 final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
@@ -22,6 +24,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/home',
                 name: 'home',
                 builder: (context, state) => const HomeScreen(),
+                routes: [_albumRoute()],
               ),
             ],
           ),
@@ -31,6 +34,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/search',
                 name: 'search',
                 builder: (context, state) => const SearchScreen(),
+                routes: [_albumRoute()],
               ),
             ],
           ),
@@ -40,6 +44,7 @@ final routerProvider = Provider<GoRouter>((ref) {
                 path: '/library',
                 name: 'library',
                 builder: (context, state) => const LibraryScreen(),
+                routes: [_albumRoute()],
               ),
             ],
           ),
@@ -51,12 +56,19 @@ final routerProvider = Provider<GoRouter>((ref) {
         pageBuilder: (context, state) => CustomTransitionPage(
           key: state.pageKey,
           child: const PlayerScreen(),
-          transitionDuration: const Duration(milliseconds: 350),
-          reverseTransitionDuration: const Duration(milliseconds: 300),
+          transitionDuration: Onda.sheetDuration,
+          reverseTransitionDuration: const Duration(milliseconds: 320),
           transitionsBuilder: (context, animation, secondaryAnimation, child) {
-            final tween = Tween(begin: const Offset(0, 1), end: Offset.zero)
-                .chain(CurveTween(curve: Curves.easeOutCubic));
-            return SlideTransition(position: animation.drive(tween), child: child);
+            final curved = CurvedAnimation(
+              parent: animation,
+              curve: Onda.sheetCurve,
+              reverseCurve: Curves.easeInCubic,
+            );
+            return SlideTransition(
+              position: Tween(begin: const Offset(0, 1.05), end: Offset.zero)
+                  .animate(curved),
+              child: child,
+            );
           },
         ),
       ),
@@ -71,3 +83,18 @@ final routerProvider = Provider<GoRouter>((ref) {
     ],
   );
 });
+
+GoRoute _albumRoute() => GoRoute(
+      path: 'album',
+      builder: (context, state) =>
+          AlbumScreen(albumName: state.uri.queryParameters['name'] ?? ''),
+    );
+
+/// Opens the album screen inside the current tab, so the tab bar and mini
+/// player stay visible underneath (the "overlay" layer of the Onda spec).
+void openAlbum(BuildContext context, String albumName) {
+  final segments = GoRouterState.of(context).uri.pathSegments;
+  final base = segments.isEmpty ? 'home' : segments.first;
+  final tab = const {'home', 'search', 'library'}.contains(base) ? base : 'home';
+  context.push('/$tab/album?name=${Uri.encodeQueryComponent(albumName)}');
+}

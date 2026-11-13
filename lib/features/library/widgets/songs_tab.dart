@@ -1,81 +1,38 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/main_shell.dart';
-import '../../../shared/models/song.dart';
-import '../../../shared/providers/song_provider.dart';
 import '../../../shared/providers/player_provider.dart';
+import '../../../shared/providers/song_provider.dart';
+import '../../../shared/theme/onda.dart';
+import '../../../shared/widgets/onda_widgets.dart';
 import '../../../shared/widgets/song_tile.dart';
 
-class SongsTab extends ConsumerStatefulWidget {
+class SongsTab extends ConsumerWidget {
   const SongsTab({super.key});
 
   @override
-  ConsumerState<SongsTab> createState() => _SongsTabState();
-}
-
-class _SongsTabState extends ConsumerState<SongsTab> {
-  void _playSong(List<Song> songs, int index) {
-    ref.read(playerActionsProvider).playFromList(songs, index: index);
-  }
-
-  void _playNext(Song song) async {
-    final actions = ref.read(playerActionsProvider);
-    await actions.playNext(song);
-  }
-
-  void _addToQueue(Song song) async {
-    final actions = ref.read(playerActionsProvider);
-    await actions.addToQueue(song);
-  }
-
-  @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final songsAsync = ref.watch(songsProvider);
-    final hasMedia = ref.watch(hasMediaProvider).asData?.value ?? false;
-    final bottomPad = MediaQuery.of(context).padding.bottom +
-        kBottomNavHeight +
-        (hasMedia ? kMiniPlayerHeight : 0);
+    final bottomPad = shellBottomPadding(context, ref);
+    final actions = ref.read(playerActionsProvider);
 
     return songsAsync.when(
       loading: () => const Center(child: CircularProgressIndicator()),
-      error: (e, _) => Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32),
-          child: Text('Error al cargar canciones: $e',
-              textAlign: TextAlign.center),
-        ),
-      ),
+      error: (e, _) => EmptyState('Error al cargar canciones: $e'),
       data: (songs) {
         if (songs.isEmpty) {
-          return Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(Icons.music_note, size: 72, color: Colors.grey.shade600),
-                const SizedBox(height: 16),
-                Text(
-                  'No se encontraron canciones',
-                  style: TextStyle(
-                      fontSize: 18,
-                      color: Colors.grey.shade500,
-                      fontWeight: FontWeight.w500),
-                ),
-                const SizedBox(height: 8),
-                TextButton.icon(
-                  onPressed: () => ref.read(songsProvider.notifier).refresh(),
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('Escanear biblioteca'),
-                ),
-              ],
+          return EmptyState(
+            'No se encontraron canciones',
+            action: TextButton(
+              onPressed: () => ref.read(songsProvider.notifier).refresh(),
+              child: Text('ESCANEAR BIBLIOTECA',
+                  style: Onda.mono(11, color: Onda.accent)),
             ),
           );
         }
-
         return RefreshIndicator(
           onRefresh: () => ref.read(songsProvider.notifier).refresh(),
-          displacement: 40,
-          color: Colors.white,
-          backgroundColor: Colors.grey.shade800,
+          color: Onda.accent,
+          backgroundColor: Onda.surface5,
           child: ListView.builder(
             padding: EdgeInsets.only(bottom: bottomPad),
             itemCount: songs.length,
@@ -83,9 +40,9 @@ class _SongsTabState extends ConsumerState<SongsTab> {
               final song = songs[index];
               return SongTile(
                 song: song,
-                onTap: () => _playSong(songs, index),
-                onPlayNext: () => _playNext(song),
-                onAddToQueue: () => _addToQueue(song),
+                onTap: () => actions.playFromList(songs, index: index),
+                onPlayNext: () => actions.playNext(song),
+                onAddToQueue: () => actions.addToQueue(song),
               );
             },
           ),

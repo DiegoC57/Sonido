@@ -1,15 +1,14 @@
-
-import 'dart:math';
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../shared/providers/player_provider.dart';
 import '../../shared/providers/song_provider.dart';
-import '../../shared/theme/app_text_styles.dart';
-import '../../shared/utils/duration_formatter.dart';
-import 'widgets/queue_sheet.dart';
+import '../../shared/theme/onda.dart';
+import '../../shared/widgets/artwork.dart';
+import '../../shared/widgets/onda_widgets.dart';
 import 'widgets/player_options_sheet.dart';
+import 'widgets/queue_sheet.dart';
 
 class PlayerScreen extends ConsumerStatefulWidget {
   const PlayerScreen({super.key});
@@ -18,224 +17,113 @@ class PlayerScreen extends ConsumerStatefulWidget {
   ConsumerState<PlayerScreen> createState() => _PlayerScreenState();
 }
 
-class _PlayerScreenState extends ConsumerState<PlayerScreen>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _rotationController;
-  Color _dominantColor = Colors.black;
+class _PlayerScreenState extends ConsumerState<PlayerScreen> {
   double _volumeGestureDelta = 0;
-  bool _isExtracting = false;
-  int? _lastExtractedId;
-  @override
-  void initState() {
-    super.initState();
-    _rotationController = AnimationController(
-      vsync: this,
-      duration: const Duration(seconds: 8),
-    );
-  }
-
-  @override
-  void dispose() {
-    _rotationController.dispose();
-    super.dispose();
-  }
-
-  void _extractColor(int audioId) {
-    if (_isExtracting) return;
-    _isExtracting = true;
-    final audioIdCapture = audioId;
-    ref.read(dominantColorProvider(audioIdCapture).future).then((color) {
-      if (!mounted || _lastExtractedId != audioIdCapture) return;
-      setState(() => _dominantColor = color);
-      _isExtracting = false;
-    }).catchError((_) {
-      if (!mounted) return;
-      setState(() => _dominantColor = Colors.black);
-      _isExtracting = false;
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     final mediaItem = ref.watch(currentMediaItemProvider).asData?.value;
-    final isPlaying = ref.watch(isPlayingProvider);
-    final position = ref.watch(positionProvider).asData?.value ?? Duration.zero;
-    final duration = ref.watch(durationProvider).asData?.value ?? Duration.zero;
-    final shuffleMode = ref.watch(shuffleModeProvider).asData?.value;
-    final repeatMode = ref.watch(repeatModeProvider).asData?.value;
+    final media = MediaQuery.of(context);
+
+    if (mediaItem == null) {
+      return const Scaffold(
+        backgroundColor: Onda.bg,
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    final audioId = mediaItem.extras?['audioId'] as int?;
+    final seed = mediaItem.album ?? mediaItem.title;
+    // Same color source as the mini player so both stay in sync.
+    final albumColor = (audioId != null
+            ? ref.watch(dominantColorProvider(audioId)).asData?.value
+            : null) ??
+        coverStyleFor(seed).bg;
+    final vivid = (audioId != null
+            ? ref.watch(vividColorProvider(audioId)).asData?.value
+            : null) ??
+        coverStyleFor(seed).fg;
+
     final actions = ref.read(playerActionsProvider);
 
-    final audioId = mediaItem?.extras?['audioId'] as int?;
-    if (audioId != null && audioId != _lastExtractedId) {
-      _lastExtractedId = audioId;
-      _extractColor(audioId);
-    }
-
-    ref.listen(currentMediaItemProvider, (prev, next) {
-      final item = next.asData?.value;
-      final newAudioId = item?.extras?['audioId'] as int?;
-      if (newAudioId != null && newAudioId != _lastExtractedId) {
-        _lastExtractedId = newAudioId;
-        _extractColor(newAudioId);
-      }
-    });
-
-    if (isPlaying && !_rotationController.isAnimating) {
-      _rotationController.repeat();
-    } else if (!isPlaying && _rotationController.isAnimating) {
-      _rotationController.stop();
-    }
-
     return Scaffold(
-      extendBodyBehindAppBar: true,
-      backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.keyboard_arrow_down, color: Colors.white70, size: 32),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const SizedBox.shrink(),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.more_vert, color: Colors.white70),
-            onPressed: mediaItem == null
-                ? null
-                : () => _showOptions(context, mediaItem),
+      backgroundColor: Onda.bg,
+      body: Stack(
+        children: [
+          // Layer 1: solid album color (animated between tracks).
+          Positioned.fill(
+            child: AnimatedContainer(
+              duration: const Duration(milliseconds: 500),
+              curve: Curves.easeOut,
+              color: albumColor,
+            ),
           ),
-        ],
-      ),
-      body: mediaItem == null
-          ? const Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  CircularProgressIndicator(color: Colors.white54),
-                  SizedBox(height: 16),
-                  Text(
-                    'Cargando...',
-                    style: TextStyle(color: Colors.grey, fontSize: 16),
-                  ),
-                ],
+          // Layer 2: fade to the app background behind the controls.
+          const Positioned.fill(
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Color(0x000B0B0C),
+                    Color(0x400B0B0C),
+                    Color(0xD90B0B0C),
+                    Onda.bg,
+                  ],
+                  stops: [0, .35, .75, 1],
+                ),
               ),
-            )
-          : Stack(
+            ),
+          ),
+          Padding(
+            padding: EdgeInsets.fromLTRB(
+              Onda.playerGutter,
+              media.padding.top + 8,
+              Onda.playerGutter,
+              media.padding.bottom + 28,
+            ),
+            child: Column(
               children: [
-                Positioned.fill(
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 1500),
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          _dominantColor,
-                          _dominantColor.withAlpha(200),
-                          Color.lerp(_dominantColor, Colors.black, 0.6)!,
-                          Colors.black,
-                        ],
-                        stops: const [0.0, 0.35, 0.75, 1.0],
-                      ),
-                    ),
+                _Header(
+                  album: mediaItem.album,
+                  onClose: () => Navigator.of(context).pop(),
+                  onMore: () => _showOptions(context, mediaItem),
+                ),
+                Expanded(
+                  child: _Cover(
+                    audioId: audioId,
+                    seed: seed,
+                    itemId: mediaItem.id,
+                    onSwipeLeft: actions.skipToNext,
+                    onSwipeRight: actions.skipToPrevious,
+                    onVerticalDrag: (delta) {
+                      _volumeGestureDelta += delta;
+                      final normalized =
+                          (_volumeGestureDelta / 300).clamp(-1.0, 1.0);
+                      actions.setVolume((normalized + 1) / 2);
+                    },
                   ),
                 ),
-                SafeArea(
-                  child: Column(
-                    children: [
-                      const Spacer(flex: 2),
-                      _RotatingArtwork(
-                        mediaItem: mediaItem,
-                        rotationController: _rotationController,
-                        onSwipeLeft: () => actions.skipToNext(),
-                        onSwipeRight: () => actions.skipToPrevious(),
-                        onVolumeChange: (delta) {
-                          _volumeGestureDelta += delta;
-                          final normalized =
-                              (_volumeGestureDelta / 300).clamp(-1.0, 1.0);
-                          final volume = (normalized + 1) / 2;
-                          actions.setVolume(volume);
-                        },
-                      ),
-                      const SizedBox(height: 24),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 40),
-                        child: Column(
-                          children: [
-                            AnimatedSwitcher(
-                              duration: const Duration(milliseconds: 300),
-                              child: Text(
-                                key: ValueKey('title_${mediaItem.id}'),
-                                mediaItem.title,
-                                style: appTitleLarge(),
-                                textAlign: TextAlign.center,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              mediaItem.artist ?? 'Artista desconocido',
-                              style: appSecondary(fontSize: 15, color: Colors.grey.shade400),
-                              textAlign: TextAlign.center,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const Spacer(flex: 2),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 8),
-                        child: _SeekBar(
-                          position: position,
-                          duration: duration,
-                          dominantColor: _dominantColor,
-                          onChanged: (value) => actions.seek(value),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      _Controls(
-                        isPlaying: isPlaying,
-                        shuffleMode:
-                            shuffleMode ?? AudioServiceShuffleMode.none,
-                        repeatMode:
-                            repeatMode ?? AudioServiceRepeatMode.none,
-                        dominantColor: _dominantColor,
-                      ),
-                      const SizedBox(height: 12),
-                      Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 24),
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            IconButton(
-                              icon: Icon(Icons.cast, color: Colors.grey.shade400),
-                              onPressed: () => _showConnect(context),
-                            ),
-                            Row(
-                              children: [
-                                IconButton(
-                                  icon: Icon(Icons.share_outlined,
-                                      color: Colors.grey.shade400),
-                                  onPressed: () => _shareCurrent(mediaItem),
-                                ),
-                                IconButton(
-                                  icon: Icon(Icons.queue_music,
-                                      color: Colors.grey.shade400),
-                                  onPressed: () => _showQueue(context),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                    ],
-                  ),
+                const SizedBox(height: 26),
+                _TitleRow(mediaItem: mediaItem),
+                const SizedBox(height: 14),
+                _ProgressBar(color: vivid),
+                const SizedBox(height: 14),
+                const _Controls(),
+                const SizedBox(height: 26),
+                _Footer(
+                  onDevice: () => _showConnect(context),
+                  onShare: () => SharePlus.instance.share(ShareParams(
+                    text: '${mediaItem.title} - ${mediaItem.artist ?? ''}',
+                  )),
+                  onQueue: () => showQueueSheet(context),
                 ),
               ],
             ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -243,209 +131,214 @@ class _PlayerScreenState extends ConsumerState<PlayerScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey.shade900,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (_) => PlayerOptionsSheet(mediaItem: mediaItem),
-    );
-  }
-
-  void _showQueue(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey.shade900,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const QueueSheet(),
     );
   }
 
   void _showConnect(BuildContext context) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey.shade900,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (_) => const Padding(
-        padding: EdgeInsets.all(32),
+      builder: (_) => Padding(
+        padding: const EdgeInsets.fromLTRB(Onda.gutter, 20, Onda.gutter, 36),
         child: Column(
           mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Icon(Icons.cast, size: 40, color: Colors.grey),
-            SizedBox(height: 12),
-            Text('No se encontraron dispositivos', style: TextStyle(color: Colors.grey)),
+            Text('Dispositivos', style: Onda.display(16)),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                const Icon(Icons.smartphone_rounded, color: Onda.success, size: 22),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Este teléfono',
+                          style: Onda.ui(14, weight: FontWeight.w500,
+                              color: Onda.success)),
+                      const SizedBox(height: 2),
+                      Text('Reproduciendo aquí',
+                          style: Onda.ui(11.5, color: Onda.text3)),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            const MonoLabel('Los auriculares Bluetooth conectados se usan automáticamente'),
           ],
         ),
       ),
     );
   }
-
-  void _shareCurrent(MediaItem mediaItem) {
-    SharePlus.instance.share(
-      ShareParams(text: '${mediaItem.title} - ${mediaItem.artist ?? ''}'),
-    );
-  }
 }
 
-class _RotatingArtwork extends StatelessWidget {
-  final MediaItem mediaItem;
-  final AnimationController rotationController;
-  final VoidCallback onSwipeLeft;
-  final VoidCallback onSwipeRight;
-  final ValueChanged<double> onVolumeChange;
+class _Header extends StatelessWidget {
+  final String? album;
+  final VoidCallback onClose;
+  final VoidCallback onMore;
 
-  const _RotatingArtwork({
-    required this.mediaItem,
-    required this.rotationController,
-    required this.onSwipeLeft,
-    required this.onSwipeRight,
-    required this.onVolumeChange,
-  });
+  const _Header({required this.album, required this.onClose, required this.onMore});
 
   @override
   Widget build(BuildContext context) {
-    final audioId = mediaItem.extras?['audioId'] as int?;
-    final size = MediaQuery.of(context).size.width * 0.7;
-
-    return GestureDetector(
-      onHorizontalDragEnd: (details) {
-        if (details.primaryVelocity == null) return;
-        if (details.primaryVelocity! < -300) {
-          onSwipeLeft();
-        } else if (details.primaryVelocity! > 300) {
-          onSwipeRight();
-        }
-      },
-      onVerticalDragUpdate: (details) {
-        onVolumeChange(details.primaryDelta ?? 0);
-      },
-      child: SizedBox(
-        width: size,
-        height: size,
-        child: AnimatedSwitcher(
-          duration: const Duration(milliseconds: 400),
-          switchInCurve: Curves.easeInOut,
-          switchOutCurve: Curves.easeInOut,
-          child: Hero(
-            key: ValueKey('artwork_${mediaItem.id}'),
-            tag: 'player_artwork',
-            child: Container(
-              width: size,
-              height: size,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                color: Colors.grey.shade900,
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withAlpha(100),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                ],
-              ),
-              clipBehavior: Clip.antiAlias,
-              child: AnimatedBuilder(
-                animation: rotationController,
-                builder: (context, child) {
-                  return Transform.rotate(
-                    angle: rotationController.value * 2 * pi,
-                    child: child,
-                  );
-                },
-                child: _ArtworkImage(audioId: audioId),
-              ),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 18),
+      child: Row(
+        children: [
+          Transform.translate(
+            offset: const Offset(-8, 0),
+            child: IconButton(
+              tooltip: 'Cerrar reproductor',
+              onPressed: onClose,
+              icon: const Icon(Icons.keyboard_arrow_down_rounded,
+                  size: 28, color: Onda.text),
             ),
           ),
-        ),
+          Expanded(
+            child: Column(
+              children: [
+                Text('REPRODUCIENDO DE',
+                    style: Onda.mono(9, tracking: 0.16, color: Onda.text3)),
+                const SizedBox(height: 4),
+                Text(
+                  album ?? 'Tu biblioteca',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  textAlign: TextAlign.center,
+                  style: Onda.ui(12, weight: FontWeight.w500),
+                ),
+              ],
+            ),
+          ),
+          Transform.translate(
+            offset: const Offset(8, 0),
+            child: IconButton(
+              tooltip: 'Más opciones',
+              onPressed: onMore,
+              icon: const DotsIcon(vertical: false, color: Color(0xB3F4F2EE)),
+            ),
+          ),
+        ],
       ),
     );
   }
 }
 
-class _ArtworkImage extends ConsumerWidget {
+class _Cover extends StatelessWidget {
   final int? audioId;
+  final Object seed;
+  final String itemId;
+  final VoidCallback onSwipeLeft;
+  final VoidCallback onSwipeRight;
+  final ValueChanged<double> onVerticalDrag;
 
-  const _ArtworkImage({this.audioId});
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    if (audioId == null) return _defaultArtwork();
-    final artworkAsync = ref.watch(artworkProvider(audioId!));
-    return artworkAsync.when(
-      loading: () => const Center(child: CircularProgressIndicator()),
-      error: (_, _) => _defaultArtwork(),
-      data: (bytes) {
-        if (bytes == null) return _defaultArtwork();
-        return Image.memory(bytes, fit: BoxFit.cover);
-      },
-    );
-  }
-
-  Widget _defaultArtwork() {
-    return Container(
-      color: Colors.grey.shade800,
-      child: Icon(Icons.music_note, size: 60, color: Colors.grey.shade600),
-    );
-  }
-}
-
-class _SeekBar extends StatelessWidget {
-  final Duration position;
-  final Duration duration;
-  final Color dominantColor;
-  final ValueChanged<Duration> onChanged;
-
-  const _SeekBar({
-    required this.position,
-    required this.duration,
-    required this.dominantColor,
-    required this.onChanged,
+  const _Cover({
+    required this.audioId,
+    required this.seed,
+    required this.itemId,
+    required this.onSwipeLeft,
+    required this.onSwipeRight,
+    required this.onVerticalDrag,
   });
 
   @override
   Widget build(BuildContext context) {
-    final totalMs = duration.inMilliseconds.toDouble();
-    final posMs = position.inMilliseconds.toDouble().clamp(0, totalMs);
-    final progress = totalMs > 0 ? posMs / totalMs : 0.0;
-
-    return Column(
-      children: [
-        SliderTheme(
-          data: SliderThemeData(
-            trackHeight: 3,
-            thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 5),
-            overlayShape: const RoundSliderOverlayShape(overlayRadius: 14),
-            activeTrackColor: dominantColor.computeLuminance() > 0.5
-                ? dominantColor
-                : dominantColor.lighten(),
-            inactiveTrackColor: Colors.white24,
-            thumbColor: Colors.white,
-            overlayColor: dominantColor.withAlpha(30),
-          ),
-          child: Slider(
-            value: progress,
-            onChanged: (value) {
-              onChanged(Duration(milliseconds: (value * totalMs).round()));
-            },
+    return LayoutBuilder(builder: (context, c) {
+      final side = c.maxWidth < c.maxHeight ? c.maxWidth : c.maxHeight;
+      return Center(
+        child: GestureDetector(
+          onHorizontalDragEnd: (d) {
+            final v = d.primaryVelocity ?? 0;
+            if (v < -300) onSwipeLeft();
+            if (v > 300) onSwipeRight();
+          },
+          onVerticalDragUpdate: (d) => onVerticalDrag(d.primaryDelta ?? 0),
+          // One Hero around the switcher: while two covers cross-fade they
+          // must not both carry the same hero tag.
+          child: Hero(
+            tag: 'player_artwork',
+            child: AnimatedSwitcher(
+              duration: const Duration(milliseconds: 350),
+              child: Artwork(
+                key: ValueKey('cover_$itemId'),
+                audioId: audioId,
+                seed: seed,
+                size: side,
+                radius: 10,
+                texture: true,
+                shadow: const [
+                  BoxShadow(
+                    color: Color(0x8C000000),
+                    blurRadius: 60,
+                    offset: Offset(0, 30),
+                  ),
+                ],
+              ),
+            ),
           ),
         ),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 4),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text(
-                formatDuration(position),
-                style: appSecondary(fontSize: 12, color: Colors.grey.shade400),
-              ),
-              Text(
-                formatDuration(duration),
-                style: appSecondary(fontSize: 12, color: Colors.grey.shade500),
-              ),
-            ],
+      );
+    });
+  }
+}
+
+class _TitleRow extends ConsumerWidget {
+  final MediaItem mediaItem;
+
+  const _TitleRow({required this.mediaItem});
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final songId = mediaItem.extras?['songId'] as int?;
+    final song =
+        songId != null ? ref.watch(songByIdProvider(songId)).asData?.value : null;
+    final saved = song?.isFavorite ?? false;
+
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Expanded(
+          child: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 250),
+            child: Column(
+              key: ValueKey(mediaItem.id),
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  mediaItem.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Onda.display(24,
+                      weight: FontWeight.w700, tracking: -0.03, height: 1.1),
+                ),
+                const SizedBox(height: 5),
+                Text(
+                  mediaItem.artist ?? 'Artista desconocido',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Onda.ui(14, color: Onda.text2),
+                ),
+              ],
+            ),
+          ),
+        ),
+        const SizedBox(width: 16),
+        IconButton(
+          tooltip: saved ? 'Quitar de favoritos' : 'Guardar en favoritos',
+          onPressed: songId == null
+              ? null
+              : () => ref.read(playerActionsProvider).toggleFavorite(songId),
+          icon: AnimatedSwitcher(
+            duration: const Duration(milliseconds: 200),
+            transitionBuilder: (child, a) => ScaleTransition(scale: a, child: child),
+            child: Icon(
+              saved ? Icons.check_rounded : Icons.add_rounded,
+              key: ValueKey(saved),
+              size: 24,
+              color: saved ? Onda.accent : const Color(0xA6F4F2EE),
+            ),
           ),
         ),
       ],
@@ -453,133 +346,272 @@ class _SeekBar extends StatelessWidget {
   }
 }
 
-class _Controls extends StatelessWidget {
-  final bool isPlaying;
-  final AudioServiceShuffleMode shuffleMode;
-  final AudioServiceRepeatMode repeatMode;
-  final Color dominantColor;
+/// 4px seek bar (8px touch padding) filled with the album's vivid color.
+class _ProgressBar extends ConsumerStatefulWidget {
+  final Color color;
 
-  const _Controls({
-    required this.isPlaying,
-    required this.shuffleMode,
-    required this.repeatMode,
-    required this.dominantColor,
+  const _ProgressBar({required this.color});
+
+  @override
+  ConsumerState<_ProgressBar> createState() => _ProgressBarState();
+}
+
+class _ProgressBarState extends ConsumerState<_ProgressBar> {
+  double? _dragRatio;
+
+  void _update(Offset local, double width) {
+    setState(() => _dragRatio = (local.dx / width).clamp(0.0, 1.0));
+  }
+
+  void _commit(Duration total) {
+    final r = _dragRatio;
+    if (r == null) return;
+    ref
+        .read(playerActionsProvider)
+        .seek(Duration(milliseconds: (r * total.inMilliseconds).round()));
+    setState(() => _dragRatio = null);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final position = ref.watch(positionProvider).asData?.value ?? Duration.zero;
+    final total = ref.watch(durationProvider).asData?.value ?? Duration.zero;
+    final totalMs = total.inMilliseconds;
+    final liveRatio =
+        totalMs > 0 ? (position.inMilliseconds / totalMs).clamp(0.0, 1.0) : 0.0;
+    final ratio = _dragRatio ?? liveRatio;
+    final shown = Duration(milliseconds: (ratio * totalMs).round());
+    final dragging = _dragRatio != null;
+
+    return Column(
+      children: [
+        LayoutBuilder(builder: (context, c) {
+          final w = c.maxWidth;
+          return Semantics(
+            slider: true,
+            label: 'Progreso de la canción',
+            value: formatMinSec(shown),
+            child: GestureDetector(
+              behavior: HitTestBehavior.opaque,
+              onTapDown: (d) => _update(d.localPosition, w),
+              onTapUp: (_) => _commit(total),
+              // A tap that turns into a drag is cancelled first; the drag
+              // re-sets the ratio. Any other cancel must not freeze the bar.
+              onTapCancel: () => setState(() => _dragRatio = null),
+              onHorizontalDragStart: (d) => _update(d.localPosition, w),
+              onHorizontalDragUpdate: (d) => _update(d.localPosition, w),
+              onHorizontalDragEnd: (_) => _commit(total),
+              onHorizontalDragCancel: () => setState(() => _dragRatio = null),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 150),
+                  height: dragging ? 6 : 4,
+                  decoration: BoxDecoration(
+                    color: Onda.track,
+                    borderRadius: BorderRadius.circular(3),
+                  ),
+                  alignment: Alignment.centerLeft,
+                  child: FractionallySizedBox(
+                    widthFactor: ratio,
+                    heightFactor: 1,
+                    child: AnimatedContainer(
+                      duration: const Duration(milliseconds: 500),
+                      decoration: BoxDecoration(
+                        color: widget.color,
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          );
+        }),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(formatMinSec(shown), style: _timeStyle),
+            Text('-${formatMinSec(total - shown)}', style: _timeStyle),
+          ],
+        ),
+      ],
+    );
+  }
+
+  static final _timeStyle = Onda.mono(10.5,
+      weight: FontWeight.w400, tracking: 0, color: const Color(0x73F4F2EE));
+}
+
+class _Controls extends ConsumerWidget {
+  const _Controls();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final isPlaying = ref.watch(isPlayingProvider);
+    final shuffle = ref.watch(shuffleModeProvider).asData?.value ==
+        AudioServiceShuffleMode.all;
+    final repeat =
+        ref.watch(repeatModeProvider).asData?.value ?? AudioServiceRepeatMode.none;
+    final actions = ref.read(playerActionsProvider);
+    const dim = Color(0xBFF4F2EE);
+
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _IconControl(
+          icon: Icons.shuffle_rounded,
+          label: shuffle ? 'Desactivar aleatorio' : 'Activar aleatorio',
+          color: shuffle ? Onda.accent : dim,
+          size: 22,
+          active: shuffle,
+          onTap: actions.toggleShuffle,
+        ),
+        _IconControl(
+          icon: Icons.skip_previous_rounded,
+          label: 'Anterior',
+          color: Onda.text,
+          size: 34,
+          box: 44,
+          onTap: actions.skipToPrevious,
+        ),
+        Semantics(
+          button: true,
+          label: isPlaying ? 'Pausar' : 'Reproducir',
+          child: Material(
+            color: Onda.text,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: actions.togglePlayPause,
+              child: SizedBox(
+                width: 70,
+                height: 70,
+                child: AnimatedSwitcher(
+                  duration: const Duration(milliseconds: 150),
+                  child: Icon(
+                    isPlaying ? Icons.pause_rounded : Icons.play_arrow_rounded,
+                    key: ValueKey(isPlaying),
+                    size: 38,
+                    color: Onda.onAccent,
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+        _IconControl(
+          icon: Icons.skip_next_rounded,
+          label: 'Siguiente',
+          color: Onda.text,
+          size: 34,
+          box: 44,
+          onTap: actions.skipToNext,
+        ),
+        _IconControl(
+          icon: repeat == AudioServiceRepeatMode.one
+              ? Icons.repeat_one_rounded
+              : Icons.repeat_rounded,
+          label: switch (repeat) {
+            AudioServiceRepeatMode.none => 'Repetir todo',
+            AudioServiceRepeatMode.one => 'Desactivar repetición',
+            _ => 'Repetir una canción',
+          },
+          color: repeat == AudioServiceRepeatMode.none ? dim : Onda.accent,
+          size: 22,
+          active: repeat != AudioServiceRepeatMode.none,
+          onTap: actions.cycleRepeatMode,
+        ),
+      ],
+    );
+  }
+}
+
+class _IconControl extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final double size;
+  final double box;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _IconControl({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.size,
+    required this.onTap,
+    this.box = 34,
+    this.active = false,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Consumer(
-      builder: (context, ref, _) {
-        final actions = ref.read(playerActionsProvider);
-        return Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 8),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+    return Semantics(
+      button: true,
+      label: label,
+      excludeSemantics: true,
+      child: InkResponse(
+        onTap: onTap,
+        radius: box * 0.75,
+        child: SizedBox(
+          width: box,
+          height: box + 8,
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _ShuffleButton(mode: shuffleMode),
-              IconButton(
-                icon: const Icon(Icons.skip_previous, size: 38),
-                color: Colors.white70,
-                onPressed: () => actions.skipToPrevious(),
-              ),
-              Container(
-                width: 72,
-                height: 72,
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  color: Colors.white,
-                  boxShadow: [
-                    BoxShadow(
-                      color: dominantColor.withAlpha(80),
-                      blurRadius: 12,
-                      spreadRadius: 1,
-                    ),
-                  ],
-                ),
-                child: IconButton(
-                  icon: Icon(
-                    isPlaying ? Icons.pause : Icons.play_arrow,
-                    size: 40,
-                    color: Colors.black87,
-                  ),
-                  onPressed: () => actions.togglePlayPause(),
-                ),
-              ),
-              IconButton(
-                icon: const Icon(Icons.skip_next, size: 38),
-                color: Colors.white70,
-                onPressed: () => actions.skipToNext(),
-              ),
-              _RepeatButton(mode: repeatMode),
+              Icon(icon, size: size, color: color),
+              // Small dot marks an active toggle (shuffle / repeat).
+              if (active)
+                Container(
+                  margin: const EdgeInsets.only(top: 3),
+                  width: 4,
+                  height: 4,
+                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                )
+              else
+                const SizedBox(height: 7),
             ],
           ),
-        );
-      },
+        ),
+      ),
     );
   }
 }
 
-class _ShuffleButton extends StatelessWidget {
-  final AudioServiceShuffleMode mode;
+class _Footer extends StatelessWidget {
+  final VoidCallback onDevice;
+  final VoidCallback onShare;
+  final VoidCallback onQueue;
 
-  const _ShuffleButton({required this.mode});
-
-  @override
-  Widget build(BuildContext context) {
-    final enabled = mode == AudioServiceShuffleMode.all;
-    return Consumer(
-      builder: (context, ref, _) {
-        return IconButton(
-          icon: Icon(
-            Icons.shuffle,
-            size: 26,
-            color: enabled
-                ? Theme.of(context).colorScheme.primary
-                : Colors.white54,
-          ),
-          onPressed: () => ref.read(playerActionsProvider).toggleShuffle(),
-        );
-      },
-    );
-  }
-}
-
-class _RepeatButton extends StatelessWidget {
-  final AudioServiceRepeatMode mode;
-
-  const _RepeatButton({required this.mode});
+  const _Footer({
+    required this.onDevice,
+    required this.onShare,
+    required this.onQueue,
+  });
 
   @override
   Widget build(BuildContext context) {
-    IconData icon;
-    Color? color;
-    switch (mode) {
-      case AudioServiceRepeatMode.one:
-        icon = Icons.repeat_one;
-        color = Theme.of(context).colorScheme.primary;
-      case AudioServiceRepeatMode.all:
-        icon = Icons.repeat;
-        color = Theme.of(context).colorScheme.primary;
-      default:
-        icon = Icons.repeat;
-        color = Colors.white54;
+    Widget link(String text, VoidCallback onTap, {Color color = const Color(0x8CF4F2EE)}) {
+      return InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 2),
+          child: Text(text, style: Onda.mono(10, color: color)),
+        ),
+      );
     }
-    return Consumer(
-      builder: (context, ref, _) {
-        return IconButton(
-          icon: Icon(icon, size: 26, color: color),
-          onPressed: () => ref.read(playerActionsProvider).cycleRepeatMode(),
-        );
-      },
-    );
-  }
-}
 
-extension _ColorExtension on Color {
-  Color lighten([double amount = 0.3]) {
-    final hsl = HSLColor.fromColor(this);
-    return hsl
-        .withLightness((hsl.lightness + amount).clamp(0.0, 1.0))
-        .toColor();
+    return Row(
+      children: [
+        link('ESTE TELÉFONO', onDevice, color: Onda.success),
+        const Spacer(),
+        link('COMPARTIR', onShare),
+        const SizedBox(width: 20),
+        link('COLA', onQueue),
+      ],
+    );
   }
 }

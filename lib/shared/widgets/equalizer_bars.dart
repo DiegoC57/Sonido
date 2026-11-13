@@ -1,77 +1,85 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 
-/// Small animated "now playing" indicator: three bars that move up and down.
-/// Freezes mid-animation when [animate] is false (paused but still current).
+/// "Now playing" indicator from the Onda spec: three 2.5px bars that scale
+/// between 30% and 100% height (0.9s ease-in-out, offsets 0 / .3s / .55s).
+/// Freezes in place when [animate] is false (paused but still current).
 class EqualizerBars extends StatefulWidget {
   final Color color;
   final bool animate;
+  final double height;
 
-  const EqualizerBars({super.key, required this.color, this.animate = true});
+  const EqualizerBars({
+    super.key,
+    required this.color,
+    this.animate = true,
+    this.height = 15,
+  });
 
   @override
   State<EqualizerBars> createState() => _EqualizerBarsState();
 }
 
-class _EqualizerBarsState extends State<EqualizerBars> with TickerProviderStateMixin {
-  late final List<AnimationController> _controllers;
+class _EqualizerBarsState extends State<EqualizerBars>
+    with SingleTickerProviderStateMixin {
+  static const _period = 900.0; // ms
+  static const _delays = [0.0, 300.0, 550.0];
+
+  late final AnimationController _controller = AnimationController(
+    vsync: this,
+    duration: const Duration(milliseconds: 900),
+  );
 
   @override
   void initState() {
     super.initState();
-    _controllers = List.generate(3, (i) {
-      return AnimationController(
-        vsync: this,
-        duration: Duration(milliseconds: 450 + i * 130),
-      );
-    });
-    if (widget.animate) _startAll();
-  }
-
-  void _startAll() {
-    for (final c in _controllers) {
-      c.repeat(reverse: true);
-    }
-  }
-
-  void _stopAll() {
-    for (final c in _controllers) {
-      c.stop();
-    }
+    if (widget.animate) _controller.repeat();
   }
 
   @override
   void didUpdateWidget(covariant EqualizerBars oldWidget) {
     super.didUpdateWidget(oldWidget);
     if (widget.animate != oldWidget.animate) {
-      widget.animate ? _startAll() : _stopAll();
+      widget.animate ? _controller.repeat() : _controller.stop();
     }
   }
 
   @override
   void dispose() {
-    for (final c in _controllers) {
-      c.dispose();
-    }
+    _controller.dispose();
     super.dispose();
+  }
+
+  double _scale(double t) {
+    // Triangle 0→1→0 eased like CSS ease-in-out keyframes 0%,100%:.3 / 50%:1.
+    final x = t < .5 ? t * 2 : (1 - t) * 2;
+    final eased = (1 - math.cos(x * math.pi)) / 2;
+    return .3 + .7 * eased;
   }
 
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      width: 16,
-      height: 16,
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.end,
-        children: _controllers.map((c) {
-          return AnimatedBuilder(
-            animation: c,
-            builder: (context, _) {
-              final height = 4 + c.value * 12;
-              return Container(width: 3, height: height, color: widget.color);
-            },
+      width: 2.5 * 3 + 2.5 * 2,
+      height: widget.height,
+      child: AnimatedBuilder(
+        animation: _controller,
+        builder: (context, _) {
+          final ms = _controller.value * _period;
+          return Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              for (final d in _delays)
+                Container(
+                  width: 2.5,
+                  height: widget.height *
+                      _scale(((ms - d) % _period + _period) % _period / _period),
+                  color: widget.color,
+                ),
+            ],
           );
-        }).toList(),
+        },
       ),
     );
   }

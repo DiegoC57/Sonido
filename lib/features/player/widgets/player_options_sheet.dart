@@ -2,9 +2,9 @@ import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:share_plus/share_plus.dart';
-import '../../../shared/models/playlist.dart';
 import '../../../shared/models/song.dart';
 import '../../../shared/providers/player_provider.dart';
+import '../../../shared/providers/playlist_provider.dart';
 import '../../../shared/providers/song_provider.dart';
 import '../../../shared/repositories/repository_providers.dart';
 import '../../../shared/widgets/create_playlist_dialog.dart';
@@ -137,14 +137,7 @@ class PlayerOptionsSheet extends ConsumerWidget {
             title: const Text('Ir a la fila'),
             onTap: () {
               Navigator.pop(context);
-              showModalBottomSheet(
-                context: context,
-                backgroundColor: Colors.grey.shade900,
-                shape: const RoundedRectangleBorder(
-                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-                ),
-                builder: (_) => const QueueSheet(),
-              );
+              showQueueSheet(context);
             },
           ),
           ListTile(
@@ -170,10 +163,6 @@ class PlayerOptionsSheet extends ConsumerWidget {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.grey.shade900,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
       builder: (_) => _AddToPlaylistSheet(song: song),
     );
   }
@@ -205,7 +194,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
-    final playlistsAsync = ref.watch(_playlistsProvider);
+    final playlistsAsync = ref.watch(playlistsProvider);
 
     return SafeArea(
       child: Column(
@@ -230,6 +219,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
               if (playlist == null) return;
               final repo = await ref.read(playlistRepositoryProvider.future);
               await repo.addSong(playlist.id, song.id);
+              refreshPlaylists(ref, playlist.id);
               if (!context.mounted) return;
               Navigator.pop(context);
             },
@@ -258,6 +248,7 @@ class _AddToPlaylistSheet extends ConsumerWidget {
                       onTap: () async {
                         final repo = await ref.read(playlistRepositoryProvider.future);
                         await repo.addSong(playlist.id, song.id);
+                        refreshPlaylists(ref, playlist.id);
                         if (!context.mounted) return;
                         Navigator.pop(context);
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -276,8 +267,3 @@ class _AddToPlaylistSheet extends ConsumerWidget {
     );
   }
 }
-
-final _playlistsProvider = FutureProvider<List<Playlist>>((ref) async {
-  final repo = await ref.watch(playlistRepositoryProvider.future);
-  return repo.getAll();
-});

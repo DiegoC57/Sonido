@@ -1,28 +1,13 @@
 import 'package:audio_service/audio_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'package:isar_community/isar.dart';
 import 'core/router.dart';
 import 'shared/providers/isar_provider.dart';
 import 'shared/providers/player_provider.dart';
 import 'shared/models/playback_info.dart';
 import 'shared/models/song.dart';
-
-const kSpotifyGreen = Color(0xFF1DB954);
-
-/// Montserrat for headline/title roles, Inter for everything else.
-TextTheme _buildTextTheme(TextTheme base) {
-  final interTheme = GoogleFonts.interTextTheme(base);
-  final montserratTheme = GoogleFonts.montserratTextTheme(base);
-  return interTheme.copyWith(
-    headlineLarge: montserratTheme.headlineLarge?.copyWith(fontWeight: FontWeight.bold),
-    headlineMedium: montserratTheme.headlineMedium?.copyWith(fontWeight: FontWeight.bold),
-    headlineSmall: montserratTheme.headlineSmall?.copyWith(fontWeight: FontWeight.bold),
-    titleLarge: montserratTheme.titleLarge?.copyWith(fontWeight: FontWeight.bold),
-    titleMedium: montserratTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
-  );
-}
+import 'shared/theme/onda.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -168,11 +153,14 @@ class _SonidoAppState extends ConsumerState<SonidoApp>
 
     return isarAsync.when(
       error: (error, stack) => MaterialApp(
+        theme: Onda.theme(),
         home: Scaffold(
           body: Center(child: Text('Error al iniciar: $error')),
         ),
       ),
       loading: () => MaterialApp(
+        theme: Onda.theme(),
+        debugShowCheckedModeBanner: false,
         home: Scaffold(
           body: Center(
             child: Column(
@@ -188,22 +176,7 @@ class _SonidoAppState extends ConsumerState<SonidoApp>
       ),
       data: (_) => MaterialApp.router(
         title: 'Sonido',
-        theme: ThemeData(
-          colorScheme: ColorScheme.fromSeed(
-            seedColor: kSpotifyGreen,
-            brightness: Brightness.dark,
-          ).copyWith(primary: kSpotifyGreen, surface: Colors.black, surfaceTint: Colors.black),
-          scaffoldBackgroundColor: Colors.black,
-          canvasColor: Colors.black,
-          useMaterial3: true,
-          brightness: Brightness.dark,
-          textTheme: _buildTextTheme(ThemeData(brightness: Brightness.dark).textTheme),
-          appBarTheme: const AppBarTheme(
-            backgroundColor: Colors.black,
-            surfaceTintColor: Colors.transparent,
-            elevation: 0,
-          ),
-        ),
+        theme: Onda.theme(),
         routerConfig: router,
         debugShowCheckedModeBanner: false,
       ),
